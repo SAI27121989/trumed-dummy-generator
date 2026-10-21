@@ -1,10 +1,11 @@
+import base64
 import io
 import os
 import fitz  # PyMuPDF
 import streamlit as st
 
 # ==========================================
-# 1. STREAMLIT PAGE CONFIGURATION & STYLING
+# 1. STREAMLIT PAGE CONFIGURATION & UI
 # ==========================================
 st.set_page_config(
     page_title="TruMed Path Labs - Dummy Report Generator",
@@ -12,20 +13,17 @@ st.set_page_config(
     layout="wide",
 )
 
-# Load logo safely if available
+# Load logo safely if present
 logo_html = ""
 logo_path = "logo.png"
 if not os.path.exists(logo_path) and os.path.exists("logo.png.jpg"):
     logo_path = "logo.png.jpg"
 
 if os.path.exists(logo_path):
-    import base64
-
     with open(logo_path, "rb") as image_file:
         encoded_logo = base64.b64encode(image_file.read()).decode()
     logo_html = f'<img src="data:image/png;base64,{encoded_logo}" style="max-height: 85px; background: white; padding: 10px; border-radius: 12px; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">'
 
-# Render custom UI banner
 st.markdown(
     f"""
     <style>
@@ -105,67 +103,95 @@ st.markdown(
 
 
 # ==========================================
-# 2. CORE PDF PROCESSING LOGIC
+# 2. SURGICAL REDACTION & WATERMARK ENGINE
 # ==========================================
-def process_metadata_field(page, keyword, new_value, x_offset=2, width=150):
-    """Helper function to search for a metadata keyword, redact its old value,
-
-    and write the new dummy value cleanly in place.
-    """
+def replace_value_inline(
+    page, keyword, new_text, font_name="helv", is_bold=False
+):
+    """Finds exact text label and replaces only the value coordinate to right of label."""
     matches = page.search_for(keyword)
     if matches:
         r = matches[0]
-        # Define rectangle covering the old value space next to the label
-        old_box = fitz.Rect(r.x1 + x_offset, r.y0 - 1, r.x1 + width, r.y1 + 1)
-        page.add_redact_annot(old_box, fill=(1, 1, 1))
+        # Bounding box for old value
+        val_box = fitz.Rect(r.x1 + 2, r.y0 - 1, r.x1 + 220, r.y1 + 1)
+        page.add_redact_annot(val_box, fill=(1, 1, 1))
         page.apply_redactions()
 
-        # Write the new dummy value
+        fname = "helv-bold" if is_bold else font_name
         page.insert_text(
-            fitz.Point(r.x1 + x_offset + 3, r.y1 - 1),
-            new_value,
+            fitz.Point(r.x1 + 4, r.y1 - 1),
+            new_text,
             fontsize=9,
-            fontname="helv",
+            fontname=fname,
             color=(0, 0, 0),
         )
 
 
-def process_report_page(page):
-    """Processes a single page:
+def apply_dummy_watermark(page):
+    """Applies centered 35-degree angled watermark 'TruMed's DUMMY REPORT'."""
+    rect = page.rect
+    watermark_text = "TruMed's DUMMY REPORT"
+    center_point = fitz.Point(rect.width * 0.5, rect.height * 0.5)
 
-    1. Updates Patient Name, Ref.Customer, TPL Code, and SID/PID.
-    2. Erases bottom signatures, doctor sign-offs, and QR verification notes.
-    """
+    fontsize = int(rect.width / 13)
+    morph = (center_point, fitz.Matrix(35))  # 35 degree rotation
+
+    page.insert_text(
+        center_point,
+        watermark_text,
+        fontsize=fontsize,
+        fontname="hebo",  # Helvetica-Bold
+        color=(0.11, 0.32, 0.84),  # TruMed Blue
+        morph=morph,
+        fill_opacity=0.15,
+    )
+
+
+def process_report_page(page):
+    """Executes surgical updates, signature/QR redactions, and adds watermark."""
     rect = page.rect
 
-    # --- STEP 1: IN-PLACE SURGICAL METADATA UPDATES ---
-    process_metadata_field(page, "Patient Name", ": Mr DUMMY", width=180)
-    process_metadata_field(page, "Ref.Customer", ": XXX", width=100)
-    process_metadata_field(page, "TPL Code", ": XXX", width=100)
-    process_metadata_field(page, "SID/PID", ": XXX", width=100)
+    # --- STEP 1: IN-PLACE METADATA SWAP ---
+    replace_value_inline(
+        page, "Patient Name", ": Mr DUMMY", font_name="helv", is_bold=True
+    )
+    replace_value_inline(page, "Ref.Doctor", ": XXX")
+    replace_value_inline(page, "Ref.Customer", ": XXX")
+    replace_value_inline(page, "TPL Code", ": XXX")
+    replace_value_inline(page, "SID/PID", ": XXX")
 
-    # --- STEP 2: REMOVE BOTTOM SIGNATURES, DOCTOR DETAILS & QR CODES ---
-    # Wipes everything from 110 points above the bottom margin down to the bottom
-    footer_wipe_start = rect.height - 110
-    footer_wipe_rect = fitz.Rect(0, footer_wipe_start, rect.width, rect.height)
-    page.add_redact_annot(footer_wipe_rect, fill=(1, 1, 1))
-
-    # Also clean up any top QR code badge ("scan to download") if present
-    top_qr_rects = page.search_for("scan to download")
-    if top_qr_rects:
-        qr_r = top_qr_rects[0]
-        qr_box = fitz.Rect(qr_r.x0 - 5, qr_r.y0 - 45, qr_r.x1 + 5, qr_r.y1 + 5)
+    # --- STEP 2: REMOVE SIGNATURES & QR CODES ---
+    # Top header QR code block ("scan to download")
+    top_qr = page.search_for("scan to download")
+    if top_qr:
+        qr_r = top_qr[0]
+        qr_box = fitz.Rect(qr_r.x0 - 10, qr_r.y0 - 50, qr_r.x1 + 10, qr_r.y1 + 10)
         page.add_redact_annot(qr_box, fill=(1, 1, 1))
 
+    # Bottom signatures redaction zone (doctor names & signatures)
+    doc_signs = page.search_for("PATHOLOGIST") + page.search_for("BIOCHEMIST")
+    for sign_rect in doc_signs:
+        sig_box = fitz.Rect(
+            sign_rect.x0 - 120,
+            sign_rect.y0 - 45,
+            sign_rect.x1 + 120,
+            sign_rect.y1 + 10,
+        )
+        page.add_redact_annot(sig_box, fill=(1, 1, 1))
+
+    # Apply all redactions
     page.apply_redactions()
+
+    # --- STEP 3: APPLY WATERMARK ---
+    apply_dummy_watermark(page)
 
 
 # ==========================================
-# 3. STREAMLIT FILE UPLOADER & UI DASHBOARD
+# 3. STREAMLIT FILE PROCESSING DASHBOARD
 # ==========================================
 st.subheader("📁 Upload Lab Reports")
 st.write(
-    "Upload your original PDF report(s) below to automatically sanitize patient details and remove signatures/QR codes."
+    "Upload original lab reports to generate standardized dummy PDFs with clear headers, watermarks, and wiped signatures."
 )
 
 uploaded_files = st.file_uploader(
@@ -177,9 +203,9 @@ if uploaded_files:
         f"📋 **{len(uploaded_files)} file(s)** uploaded and ready for processing."
     )
 
-    if st.button("🚀 Process & Generate Clean Dummy PDF"):
+    if st.button("🚀 Process & Generate Dummy PDF"):
         with st.spinner(
-            "Executing surgical metadata updates and removing signatures..."
+            "Updating metadata, generating watermarks, and clearing signatures..."
         ):
             combined_pdf = fitz.open()
             total_pages = 0
@@ -195,7 +221,6 @@ if uploaded_files:
                     )
                     total_pages += 1
 
-            # Save to memory bytes container
             output_bytes = io.BytesIO()
             combined_pdf.save(output_bytes)
             combined_pdf.close()
@@ -204,10 +229,9 @@ if uploaded_files:
                 f"✅ Done! Successfully processed all **{total_pages} page(s)**."
             )
 
-            # Download button for the output file
             st.download_button(
                 label="📥 Download Processed Dummy Report PDF",
                 data=output_bytes.getvalue(),
-                file_name="TruMed_Dummy_Report_Clean.pdf",
+                file_name="TruMed_Dummy_Report_Final.pdf",
                 mime="application/pdf",
             )
