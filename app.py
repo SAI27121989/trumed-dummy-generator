@@ -105,66 +105,72 @@ st.markdown(
 def process_report_page(page):
     rect = page.rect
 
-    # --- STEP 1: PRECISELY MASK ONLY PATIENT INFO & QR/SIGNATURE AREAS ---
-    # Safe patient info block (avoids bleeding into table headers)
+    # --- STEP 1: PRECISELY MASK ONLY PATIENT DATA ROWS (Leaving top logo intact) ---
     page.draw_rect(
-        fitz.Rect(18, 72, rect.width - 18, 162), color=(1, 1, 1), fill=(1, 1, 1)
+        fitz.Rect(18, 105, rect.width - 18, 185), color=(1, 1, 1), fill=(1, 1, 1)
     )
 
-    # Safe signature and QR removal blocks at the bottom
+    # Mask top right QR code area
+    page.draw_rect(
+        fitz.Rect(rect.width - 95, 75, rect.width - 15, 175),
+        color=(1, 1, 1),
+        fill=(1, 1, 1),
+    )
+
+    # Mask bottom signature graphic areas
     page.draw_rect(
         fitz.Rect(
-            rect.width - 220, rect.height - 160, rect.width - 20, rect.height - 75
+            rect.width - 240, rect.height - 155, rect.width - 20, rect.height - 95
         ),
         color=(1, 1, 1),
         fill=(1, 1, 1),
     )
     page.draw_rect(
-        fitz.Rect(20, rect.height - 160, 220, rect.height - 75),
+        fitz.Rect(20, rect.height - 155, 240, rect.height - 95),
         color=(1, 1, 1),
         fill=(1, 1, 1),
     )
 
     # --- STEP 2: INSERT CLEAN DUMMY PLACEHOLDER TEXT ---
     page.insert_text(
-        fitz.Point(22, 88),
+        fitz.Point(22, 120),
         "Patient Name : DUMMY PATIENT",
         fontsize=9.5,
         color=(0, 0, 0),
     )
     page.insert_text(
-        fitz.Point(22, 106),
+        fitz.Point(22, 137),
         "Age/Sex           : 30 Year(s) / General",
         fontsize=9.5,
         color=(0, 0, 0),
     )
     page.insert_text(
-        fitz.Point(22, 124), "Ref.Doctor      : XXX", fontsize=9.5, color=(0, 0, 0)
+        fitz.Point(22, 154), "Ref.Doctor      : XXX", fontsize=9.5, color=(0, 0, 0)
     )
     page.insert_text(
-        fitz.Point(22, 142),
+        fitz.Point(22, 171),
         "Ref.Customer   : XXX",
         fontsize=9.5,
         color=(0, 0, 0),
     )
 
     page.insert_text(
-        fitz.Point(340, 88), "SID/PID    : XXX", fontsize=9.5, color=(0, 0, 0)
+        fitz.Point(340, 120), "SID/PID    : XXX", fontsize=9.5, color=(0, 0, 0)
     )
     page.insert_text(
-        fitz.Point(340, 106),
+        fitz.Point(340, 137),
         "Collected  : 2026-10-21 10:00:00",
         fontsize=9.5,
         color=(0, 0, 0),
     )
     page.insert_text(
-        fitz.Point(340, 124),
+        fitz.Point(340, 154),
         "Registered : 2026-10-21 11:00:00",
         fontsize=9.5,
         color=(0, 0, 0),
     )
     page.insert_text(
-        fitz.Point(340, 142),
+        fitz.Point(340, 171),
         "Reported   : 2026-10-21 12:00:00",
         fontsize=9.5,
         color=(0, 0, 0),
