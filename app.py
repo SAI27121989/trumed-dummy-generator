@@ -119,9 +119,17 @@ def process_report_page(page):
     header_rect = fitz.Rect(18, y0, rect.width - 18, y_end)
     page.add_redact_annot(header_rect, fill=(1, 1, 1))
 
-    # --- STEP 2: COMPLETE BOTTOM FOOTER WIPE (NO SIGNS, NO DISCLAIMERS) ---
-    footer_y_start = rect.height - 110
-    footer_rect = fitz.Rect(18, footer_y_start, rect.width - 18, rect.height - 15)
+    # --- STEP 2: COMPLETE SURGICAL FOOTER WIPE (REMOVES ALL DISCLAIMERS & NOTES) ---
+    footer_y = rect.height - 110
+    assay_instances = page.search_for("NOTE: Assay")
+    processed_instances = page.search_for("Processed at")
+
+    if assay_instances:
+        footer_y = assay_instances[0].y0 - 4
+    elif processed_instances:
+        footer_y = processed_instances[0].y0 - 4
+
+    footer_rect = fitz.Rect(18, footer_y, rect.width - 18, rect.height - 10)
     page.add_redact_annot(footer_rect, fill=(1, 1, 1))
 
     page.apply_redactions()
@@ -201,22 +209,22 @@ def process_report_page(page):
         color=(0, 0, 0),
     )
 
-    # --- STEP 4: FIT-TO-PAGE CASE-SENSITIVE WATERMARK ---
+    # --- STEP 4: BOLD, FULL-PAGE CENTERED WATERMARK ---
     watermark_text = "TruMed's DUMMY REPORT"
-    center_point = fitz.Point(rect.width * 0.3, rect.height * 0.6)
-    
-    # Calculate proportional font size based on page width
-    dynamic_fontsize = int(rect.width / 15)
-    
-    morph = (center_point, fitz.Matrix(30))
+    center_point = fitz.Point(rect.width * 0.5, rect.height * 0.5)
+
+    # Bold font ("hebo" = Helvetica-Bold) with proportional full-page sizing
+    dynamic_fontsize = int(rect.width / 11)
+    morph = (center_point, fitz.Matrix(35))
+
     page.insert_text(
         center_point,
         watermark_text,
         fontsize=dynamic_fontsize,
-        fontname="helv",
+        fontname="hebo",
         color=(0.11, 0.32, 0.84),  # Professional Blue
         morph=morph,
-        fill_opacity=0.18,
+        fill_opacity=0.15,
     )
 
 
@@ -237,7 +245,7 @@ if uploaded_files:
 
     if st.button("🚀 Process & Generate Unified Dummy PDF"):
         with st.spinner(
-            "Sanitizing headers, clearing footers, applying fit-to-page watermarks..."
+            "Sanitizing headers, wiping footers, applying bold full-page watermarks..."
         ):
             combined_pdf = fitz.open()
             total_pages = 0
