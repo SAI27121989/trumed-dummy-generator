@@ -1,7 +1,6 @@
 import io
 import os
 import fitz  # PyMuPDF
-from PIL import Image, ImageDraw, ImageFont
 import streamlit as st
 
 # --- PAGE CONFIGURATION ---
@@ -113,24 +112,26 @@ def process_report_page(page):
         patient_redact_rect = fitz.Rect(18, y0, rect.width - 18, y0 + 82)
         page.add_redact_annot(patient_redact_rect, fill=(1, 1, 1))
 
-    # --- STEP 2: DYNAMIC SIGNATURE SCRIBBLE REDACTION ---
-    # Target only the line where handwritten signatures overlap, leaving titles intact
+    # --- STEP 2: SIGNATURE ZONE REDACTION & RE-STAMPING ---
     biochem_instances = page.search_for("BIOCHEMIST")
     path_instances = page.search_for("PATHOLOGIST")
 
+    b_y = rect.height - 100
+    p_y = rect.height - 100
+
     if biochem_instances:
-        b_rect = biochem_instances[0]
-        sig_left_rect = fitz.Rect(20, b_rect.y0 - 35, 230, b_rect.y0 - 12)
+        b_y = biochem_instances[0].y0
+        sig_left_rect = fitz.Rect(20, b_y - 50, 240, b_y + 15)
         page.add_redact_annot(sig_left_rect, fill=(1, 1, 1))
 
     if path_instances:
-        p_rect = path_instances[0]
+        p_y = path_instances[0].y0
         sig_right_rect = fitz.Rect(
-            rect.width - 240, p_rect.y0 - 35, rect.width - 20, p_rect.y0 - 12
+            rect.width - 250, p_y - 50, rect.width - 20, p_y + 15
         )
         page.add_redact_annot(sig_right_rect, fill=(1, 1, 1))
 
-    # Apply redactions
+    # Apply redactions to wipe out headers, old signatures, and old names cleanly
     page.apply_redactions()
 
     # --- STEP 3: INSERT CLEAN DUMMY PATIENT METADATA ---
@@ -198,38 +199,54 @@ def process_report_page(page):
         color=(0, 0, 0),
     )
 
-    # --- STEP 4: RENDER TO IMAGE & APPLY VISIBLE DIAGONAL WATERMARK ---
-    pix = page.get_pixmap(dpi=200)
-    img = Image.open(io.BytesIO(pix.tobytes("png"))).convert("RGBA")
-    w, h = img.size
-
-    text_img = Image.new("RGBA", (w, h), (255, 255, 255, 0))
-    text_draw = ImageDraw.Draw(text_img)
-
-    watermark_text = "TRUMED DUMMY REPORT - FOR TRAINING ONLY"
-    try:
-        font = ImageFont.truetype("arial.ttf", 55)
-    except IOError:
-        font = ImageFont.load_default()
-
-    # Draw centered watermark text with clear visibility (Alpha = 65)
-    text_draw.text(
-        (w // 12, h // 2.2),
-        watermark_text,
-        fill=(29, 82, 216, 65),
-        font=font,
+    # --- STEP 4: RE-STAMP CLEAN DOCTOR NAMES & TITLES ---
+    # Left Doctor (Biochemist)
+    page.insert_text(
+        fitz.Point(22, b_y - 12),
+        "CH Samuel",
+        fontsize=10,
+        fontname="helv",
+        color=(0, 0, 0),
+    )
+    page.insert_text(
+        fitz.Point(22, b_y + 3),
+        "BIOCHEMIST",
+        fontsize=9,
+        fontname="helv",
+        color=(0, 0, 0),
     )
 
-    rotated_watermark = text_img.rotate(30, expand=True)
-    px = (rotated_watermark.width - w) // 2
-    py = (rotated_watermark.height - h) // 2
-    cropped_watermark = rotated_watermark.crop((px, py, px + w, py + h))
+    # Right Doctor (Pathologist)
+    page.insert_text(
+        fitz.Point(rect.width - 200, p_y - 12),
+        "Dr R Harshavardhini",
+        fontsize=10,
+        fontname="helv",
+        color=(0, 0, 0),
+    )
+    page.insert_text(
+        fitz.Point(rect.width - 200, p_y + 3),
+        "DNB PATHOLOGIST",
+        fontsize=9,
+        fontname="helv",
+        color=(0, 0, 0),
+    )
 
-    final_img = Image.alpha_composite(img, cropped_watermark).convert("RGB")
+    # --- STEP 5: GUARANTEED NATIVE VECTOR WATERMARK ---
+    watermark_text = "TRUMED DUMMY REPORT - FOR TRAINING ONLY"
+    center_point = fitz.Point(rect.width * 0.1, rect.height * 0.6)
 
-    pdf_bytes = io.BytesIO()
-    final_img.save(pdf_bytes, format="PDF", resolution=200)
-    return pdf_bytes.getvalue()
+    # Using transformation matrix for reliable diagonal placement across all platforms
+    morph = (center_point, fitz.Matrix(30))
+    page.insert_text(
+        center_point,
+        watermark_text,
+        fontsize=28,
+        fontname="helv",
+        color=(0.11, 0.32, 0.84),  # Sky Blue
+        morph=morph,
+        fill_opacity=0.22,
+    )
 
 
 # --- DASHBOARD CARD CONTAINER ---
@@ -249,7 +266,7 @@ if uploaded_files:
 
     if st.button("🚀 Process & Generate Unified Dummy PDF"):
         with st.spinner(
-            "Sanitizing patient data, stripping signature lines, watermarking, and merging all pages..."
+            "Sanitizing patient data, stripping signatures, watermarking, and merging all pages..."
         ):
             combined_pdf = fitz.open()
             total_pages = 0
@@ -259,24 +276,8 @@ if uploaded_files:
 
                 for page_num in range(len(doc)):
                     page = doc[page_num]
-                    processed_bytes = process_report_page(page)
-                    processed_doc = fitz.open(
-                        stream=processed_bytes, filetype="pdf"
-                    )
-                    combined_pdf.insert_pdf(processed_doc)
+                    process_report_page(page)
+                    combined_pdf.insert_pdf(doc, from_page=page_num, to_page=page_num)
                     total_pages += 1
 
-            output_bytes = io.BytesIO()
-            combined_pdf.save(output_bytes)
-            combined_pdf.close()
-
-            st.success(
-                f"✅ Done! Successfully processed all **{total_pages} page(s)** across **{len(uploaded_files)} report file(s)**."
-            )
-
-            st.download_button(
-                label="📥 Download Merged Dummy Report PDF",
-                data=output_bytes.getvalue(),
-                file_name="TruMed_Dummy_Report_Merged.pdf",
-                mime="application/pdf",
-            )
+            output_bytes =
