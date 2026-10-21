@@ -1,7 +1,6 @@
 import io
 import os
 import fitz  # PyMuPDF
-from PIL import Image, ImageDraw, ImageFont
 import streamlit as st
 
 # --- PAGE CONFIGURATION ---
@@ -105,107 +104,113 @@ st.markdown(
 def process_report_page(page):
     rect = page.rect
 
-    # --- STEP 1: TRUE REDACTION FOR PATIENT DETAILS AREA ---
-    patient_redact_rect = fitz.Rect(18, 70, rect.width - 18, 168)
-    page.add_redact_annot(patient_redact_rect, fill=(1, 1, 1))
+    # --- STEP 1: DYNAMIC PATIENT HEADER REDACTION ---
+    # Find keyword locations to determine exact boundaries dynamically
+    p_name_instances = page.search_for("Patient Name")
+    if p_name_instances:
+        y0 = p_name_instances[0].y0 - 5
+        patient_redact_rect = fitz.Rect(18, y0, rect.width - 18, y0 + 82)
+        page.add_redact_annot(patient_redact_rect, fill=(1, 1, 1))
 
-    # --- STEP 2: TRUE REDACTION FOR DOCTOR SIGNATURES ---
-    sig_left_rect = fitz.Rect(20, rect.height - 210, 230, rect.height - 160)
-    sig_right_rect = fitz.Rect(
-        rect.width - 240, rect.height - 210, rect.width - 20, rect.height - 160
-    )
-    page.add_redact_annot(sig_left_rect, fill=(1, 1, 1))
-    page.add_redact_annot(sig_right_rect, fill=(1, 1, 1))
+    # --- STEP 2: DYNAMIC SIGNATURE REDACTION ---
+    biochem_instances = page.search_for("BIOCHEMIST")
+    path_instances = page.search_for("PATHOLOGIST")
 
-    # Apply all redactions to completely strip old text layers
+    if biochem_instances:
+        b_rect = biochem_instances[0]
+        sig_left_rect = fitz.Rect(20, b_rect.y0 - 45, 230, b_rect.y0 - 5)
+        page.add_redact_annot(sig_left_rect, fill=(1, 1, 1))
+
+    if path_instances:
+        p_rect = path_instances[0]
+        sig_right_rect = fitz.Rect(
+            rect.width - 240, p_rect.y0 - 45, rect.width - 20, p_rect.y0 - 5
+        )
+        page.add_redact_annot(sig_right_rect, fill=(1, 1, 1))
+
+    # Apply redactions to entirely clear old underlying text & signatures
     page.apply_redactions()
 
     # --- STEP 3: INSERT CLEAN DUMMY PATIENT METADATA ---
+    base_y = y0 if p_name_instances else 75
+
     # Left Column Fields
     page.insert_text(
-        fitz.Point(22, 85),
+        fitz.Point(22, base_y + 12),
         "Patient Name : Mr. DUMMY PATIENT",
         fontsize=9.5,
         color=(0, 0, 0),
     )
     page.insert_text(
-        fitz.Point(22, 101),
+        fitz.Point(22, base_y + 28),
         "Age/Sex           : 30 Year(s) / Male",
         fontsize=9.5,
         color=(0, 0, 0),
     )
     page.insert_text(
-        fitz.Point(22, 117), "Ref.Doctor      : XXX", fontsize=9.5, color=(0, 0, 0)
+        fitz.Point(22, base_y + 44),
+        "Ref.Doctor      : XXX",
+        fontsize=9.5,
+        color=(0, 0, 0),
     )
     page.insert_text(
-        fitz.Point(22, 133),
+        fitz.Point(22, base_y + 60),
         "Ref.Customer   : XXX",
         fontsize=9.5,
         color=(0, 0, 0),
     )
     page.insert_text(
-        fitz.Point(22, 149), "TPL Code         : XXX", fontsize=9.5, color=(0, 0, 0)
+        fitz.Point(22, base_y + 76),
+        "TPL Code         : XXX",
+        fontsize=9.5,
+        color=(0, 0, 0),
     )
 
     # Right Column Fields
     page.insert_text(
-        fitz.Point(340, 85), "Sample Type : Serum", fontsize=9.5, color=(0, 0, 0)
+        fitz.Point(340, base_y + 12),
+        "Sample Type : Serum",
+        fontsize=9.5,
+        color=(0, 0, 0),
     )
     page.insert_text(
-        fitz.Point(340, 101), "SID/PID        : XXX", fontsize=9.5, color=(0, 0, 0)
+        fitz.Point(340, base_y + 28),
+        "SID/PID        : XXX",
+        fontsize=9.5,
+        color=(0, 0, 0),
     )
     page.insert_text(
-        fitz.Point(340, 117),
+        fitz.Point(340, base_y + 44),
         "Collected on : 2026-10-21 10:00:00",
         fontsize=9.5,
         color=(0, 0, 0),
     )
     page.insert_text(
-        fitz.Point(340, 133),
+        fitz.Point(340, base_y + 60),
         "Registered on : 2026-10-21 11:00:00",
         fontsize=9.5,
         color=(0, 0, 0),
     )
     page.insert_text(
-        fitz.Point(340, 149),
+        fitz.Point(340, base_y + 76),
         "Reported on   : 2026-10-21 12:00:00",
         fontsize=9.5,
         color=(0, 0, 0),
     )
 
-    # --- STEP 4: RENDER TO HIGH-RES IMAGE & ADD SIZE 72 SKY BLUE WATERMARK ---
-    pix = page.get_pixmap(dpi=250)
-    img = Image.open(io.BytesIO(pix.tobytes("png"))).convert("RGBA")
-    w, h = img.size
-
-    text_img = Image.new("RGBA", (w, h), (255, 255, 255, 0))
-    text_draw = ImageDraw.Draw(text_img)
-
+    # --- STEP 4: CRISP VECTOR WATERMARK ---
     watermark_text = "TRUMED DUMMY REPORT - FOR TRAINING ONLY"
-    try:
-        font = ImageFont.truetype("arial.ttf", 72)
-    except IOError:
-        font = ImageFont.load_default()
-
-    # Sky Blue color with professional transparency (R=29, G=82, B=216, Alpha=80)
-    text_draw.text(
-        (w // 14, h // 2.3),
+    point = fitz.Point(rect.width * 0.15, rect.height * 0.55)
+    page.insert_text(
+        point,
         watermark_text,
-        fill=(29, 82, 216, 80),
-        font=font,
+        fontsize=38,
+        color=(0.11, 0.32, 0.84),  # Sky Blue
+        rotate=30,
+        fill_opacity=0.18,
     )
 
-    rotated_watermark = text_img.rotate(30, expand=True)
-    px = (rotated_watermark.width - w) // 2
-    py = (rotated_watermark.height - h) // 2
-    cropped_watermark = rotated_watermark.crop((px, py, px + w, py + h))
-
-    final_img = Image.alpha_composite(img, cropped_watermark).convert("RGB")
-
-    # --- STEP 5: FLATTEN INTO SECURE NON-EDITABLE PDF PAGE ---
-    pdf_bytes = io.BytesIO()
-    final_img.save(pdf_bytes, format="PDF", resolution=250)
-    return pdf_bytes.getvalue()
+    return page.get_text("pdf")
 
 
 # --- DASHBOARD CARD CONTAINER ---
