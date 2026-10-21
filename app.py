@@ -105,11 +105,10 @@ st.markdown(
 def process_report_page(page):
     rect = page.rect
 
-    # --- STEP 1: PRECISELY MASK ONLY PATIENT DATA ROWS (Leaving top logo intact) ---
+    # --- STEP 1: PRECISELY MASK PATIENT DETAILS ---
     page.draw_rect(
         fitz.Rect(18, 105, rect.width - 18, 185), color=(1, 1, 1), fill=(1, 1, 1)
     )
-
     # Mask top right QR code area
     page.draw_rect(
         fitz.Rect(rect.width - 95, 75, rect.width - 15, 175),
@@ -117,21 +116,21 @@ def process_report_page(page):
         fill=(1, 1, 1),
     )
 
-    # Mask bottom signature graphic areas
+    # --- STEP 2: PRECISELY MASK HANDWRITTEN SIGNATURES ABOVE NAMES ---
+    page.draw_rect(
+        fitz.Rect(20, rect.height - 185, 250, rect.height - 125),
+        color=(1, 1, 1),
+        fill=(1, 1, 1),
+    )
     page.draw_rect(
         fitz.Rect(
-            rect.width - 240, rect.height - 155, rect.width - 20, rect.height - 95
+            rect.width - 270, rect.height - 185, rect.width - 20, rect.height - 125
         ),
         color=(1, 1, 1),
         fill=(1, 1, 1),
     )
-    page.draw_rect(
-        fitz.Rect(20, rect.height - 155, 240, rect.height - 95),
-        color=(1, 1, 1),
-        fill=(1, 1, 1),
-    )
 
-    # --- STEP 2: INSERT CLEAN DUMMY PLACEHOLDER TEXT ---
+    # --- STEP 3: INSERT CLEAN DUMMY PLACEHOLDER TEXT ---
     page.insert_text(
         fitz.Point(22, 120),
         "Patient Name : DUMMY PATIENT",
@@ -176,7 +175,7 @@ def process_report_page(page):
         color=(0, 0, 0),
     )
 
-    # --- STEP 3: RENDER TO HIGH-RES IMAGE & ADD WATERMARK ---
+    # --- STEP 4: RENDER TO HIGH-RES IMAGE & ADD CLEAR WATERMARK ---
     pix = page.get_pixmap(dpi=250)
     img = Image.open(io.BytesIO(pix.tobytes("png"))).convert("RGBA")
     w, h = img.size
@@ -186,14 +185,15 @@ def process_report_page(page):
 
     watermark_text = "TRUMED DUMMY REPORT - FOR TRAINING ONLY"
     try:
-        font = ImageFont.truetype("arial.ttf", int(w * 0.04))
+        font = ImageFont.truetype("arial.ttf", int(w * 0.045))
     except IOError:
         font = ImageFont.load_default()
 
+    # Draw a prominent, clearly visible gray watermark across the center
     text_draw.text(
-        (w // 6, h // 2.2),
+        (w // 8, h // 2.3),
         watermark_text,
-        fill=(150, 150, 150, 90),
+        fill=(110, 110, 110, 130),
         font=font,
     )
 
@@ -204,7 +204,7 @@ def process_report_page(page):
 
     final_img = Image.alpha_composite(img, cropped_watermark).convert("RGB")
 
-    # --- STEP 4: FLATTEN INTO SECURE NON-EDITABLE PDF PAGE ---
+    # --- STEP 5: FLATTEN INTO SECURE NON-EDITABLE PDF PAGE ---
     pdf_bytes = io.BytesIO()
     final_img.save(pdf_bytes, format="PDF", resolution=250)
     return pdf_bytes.getvalue()
@@ -227,7 +227,7 @@ if uploaded_files:
 
     if st.button("🚀 Process & Generate Unified Dummy PDF"):
         with st.spinner(
-            "Sanitizing patient data, stripping signatures/QRs, watermarking, and merging..."
+            "Sanitizing patient data, stripping signatures, watermarking, and merging all pages..."
         ):
             combined_pdf = fitz.open()
             total_pages = 0
@@ -249,7 +249,7 @@ if uploaded_files:
             combined_pdf.close()
 
             st.success(
-                f"✅ Done! Processed **{total_pages} page(s)** across **{len(uploaded_files)} report file(s)**."
+                f"✅ Done! Successfully processed all **{total_pages} page(s)** across **{len(uploaded_files)} report file(s)**."
             )
 
             st.download_button(
