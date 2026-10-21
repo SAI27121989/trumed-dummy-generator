@@ -104,13 +104,20 @@ st.markdown(
 def process_report_page(page):
     rect = page.rect
 
-    # --- STEP 1: DYNAMIC PATIENT HEADER REDACTION ---
+    # --- STEP 1: PRECISE BOUNDED HEADER REDACTION ---
     p_name_instances = page.search_for("Patient Name")
+    test_desc_instances = page.search_for("TEST DESCRIPTION")
+
     y0 = 75
+    y_end = 165
+
     if p_name_instances:
-        y0 = p_name_instances[0].y0 - 5
-        patient_redact_rect = fitz.Rect(18, y0, rect.width - 18, y0 + 82)
-        page.add_redact_annot(patient_redact_rect, fill=(1, 1, 1))
+        y0 = p_name_instances[0].y0 - 4
+    if test_desc_instances:
+        y_end = test_desc_instances[0].y0 - 2
+
+    header_rect = fitz.Rect(18, y0, rect.width - 18, y_end)
+    page.add_redact_annot(header_rect, fill=(1, 1, 1))
 
     # --- STEP 2: SIGNATURE ZONE REDACTION & RE-STAMPING ---
     biochem_instances = page.search_for("BIOCHEMIST")
@@ -121,50 +128,54 @@ def process_report_page(page):
 
     if biochem_instances:
         b_y = biochem_instances[0].y0
-        sig_left_rect = fitz.Rect(20, b_y - 50, 240, b_y + 15)
+        sig_left_rect = fitz.Rect(20, b_y - 45, 240, b_y + 12)
         page.add_redact_annot(sig_left_rect, fill=(1, 1, 1))
 
     if path_instances:
         p_y = path_instances[0].y0
         sig_right_rect = fitz.Rect(
-            rect.width - 250, p_y - 50, rect.width - 20, p_y + 15
+            rect.width - 250, p_y - 45, rect.width - 20, p_y + 12
         )
         page.add_redact_annot(sig_right_rect, fill=(1, 1, 1))
 
-    # Apply redactions to wipe out headers, old signatures, and old names cleanly
     page.apply_redactions()
 
     # --- STEP 3: INSERT CLEAN DUMMY PATIENT METADATA ---
-    base_y = y0
+    base_y = y0 + 2
 
     page.insert_text(
         fitz.Point(22, base_y + 12),
         "Patient Name : Mr. DUMMY PATIENT",
         fontsize=9.5,
+        fontname="helv",
         color=(0, 0, 0),
     )
     page.insert_text(
         fitz.Point(22, base_y + 28),
         "Age/Sex           : 30 Year(s) / Male",
         fontsize=9.5,
+        fontname="helv",
         color=(0, 0, 0),
     )
     page.insert_text(
         fitz.Point(22, base_y + 44),
         "Ref.Doctor      : XXX",
         fontsize=9.5,
+        fontname="helv",
         color=(0, 0, 0),
     )
     page.insert_text(
         fitz.Point(22, base_y + 60),
         "Ref.Customer   : XXX",
         fontsize=9.5,
+        fontname="helv",
         color=(0, 0, 0),
     )
     page.insert_text(
         fitz.Point(22, base_y + 76),
         "TPL Code         : XXX",
         fontsize=9.5,
+        fontname="helv",
         color=(0, 0, 0),
     )
 
@@ -172,43 +183,48 @@ def process_report_page(page):
         fitz.Point(340, base_y + 12),
         "Sample Type : Serum",
         fontsize=9.5,
+        fontname="helv",
         color=(0, 0, 0),
     )
     page.insert_text(
         fitz.Point(340, base_y + 28),
         "SID/PID        : XXX",
         fontsize=9.5,
+        fontname="helv",
         color=(0, 0, 0),
     )
     page.insert_text(
         fitz.Point(340, base_y + 44),
         "Collected on : 2026-10-21 10:00:00",
         fontsize=9.5,
+        fontname="helv",
         color=(0, 0, 0),
     )
     page.insert_text(
         fitz.Point(340, base_y + 60),
         "Registered on : 2026-10-21 11:00:00",
         fontsize=9.5,
+        fontname="helv",
         color=(0, 0, 0),
     )
     page.insert_text(
         fitz.Point(340, base_y + 76),
         "Reported on   : 2026-10-21 12:00:00",
         fontsize=9.5,
+        fontname="helv",
         color=(0, 0, 0),
     )
 
     # --- STEP 4: RE-STAMP CLEAN DOCTOR NAMES & TITLES ---
     page.insert_text(
-        fitz.Point(22, b_y - 12),
+        fitz.Point(22, b_y - 10),
         "CH Samuel",
         fontsize=10,
         fontname="helv",
         color=(0, 0, 0),
     )
     page.insert_text(
-        fitz.Point(22, b_y + 3),
+        fitz.Point(22, b_y + 5),
         "BIOCHEMIST",
         fontsize=9,
         fontname="helv",
@@ -216,24 +232,24 @@ def process_report_page(page):
     )
 
     page.insert_text(
-        fitz.Point(rect.width - 200, p_y - 12),
+        fitz.Point(rect.width - 200, p_y - 10),
         "Dr R Harshavardhini",
         fontsize=10,
         fontname="helv",
         color=(0, 0, 0),
     )
     page.insert_text(
-        fitz.Point(rect.width - 200, p_y + 3),
+        fitz.Point(rect.width - 200, p_y + 5),
         "DNB PATHOLOGIST",
         fontsize=9,
         fontname="helv",
         color=(0, 0, 0),
     )
 
-    # --- STEP 5: GUARANTEED NATIVE VECTOR WATERMARK ---
-    watermark_text = "TRUMED DUMMY REPORT - FOR TRAINING ONLY"
-    center_point = fitz.Point(rect.width * 0.1, rect.height * 0.6)
-    morph = (center_point, fitz.Matrix(30))
+    # --- STEP 5: TRUMED DUMMY REPORT WATERMARK ---
+    watermark_text = "TRUMED DUMMY REPORT"
+    center_point = fitz.Point(rect.width * 0.15, rect.height * 0.55)
+    morph = (center_point, fitz.Matrix(25))
     page.insert_text(
         center_point,
         watermark_text,
@@ -241,7 +257,7 @@ def process_report_page(page):
         fontname="helv",
         color=(0.11, 0.32, 0.84),
         morph=morph,
-        fill_opacity=0.22,
+        fill_opacity=0.20,
     )
 
 
@@ -261,9 +277,7 @@ if uploaded_files:
     )
 
     if st.button("🚀 Process & Generate Unified Dummy PDF"):
-        with st.spinner(
-            "Sanitizing patient data, stripping signatures, watermarking, and merging all pages..."
-        ):
+        with st.spinner("Processing reports and stamping watermarks..."):
             combined_pdf = fitz.open()
             total_pages = 0
 
