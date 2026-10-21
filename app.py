@@ -200,7 +200,6 @@ def process_report_page(page):
     )
 
     # --- STEP 4: RE-STAMP CLEAN DOCTOR NAMES & TITLES ---
-    # Left Doctor (Biochemist)
     page.insert_text(
         fitz.Point(22, b_y - 12),
         "CH Samuel",
@@ -216,7 +215,6 @@ def process_report_page(page):
         color=(0, 0, 0),
     )
 
-    # Right Doctor (Pathologist)
     page.insert_text(
         fitz.Point(rect.width - 200, p_y - 12),
         "Dr R Harshavardhini",
@@ -235,15 +233,13 @@ def process_report_page(page):
     # --- STEP 5: GUARANTEED NATIVE VECTOR WATERMARK ---
     watermark_text = "TRUMED DUMMY REPORT - FOR TRAINING ONLY"
     center_point = fitz.Point(rect.width * 0.1, rect.height * 0.6)
-
-    # Using transformation matrix for reliable diagonal placement across all platforms
     morph = (center_point, fitz.Matrix(30))
     page.insert_text(
         center_point,
         watermark_text,
         fontsize=28,
         fontname="helv",
-        color=(0.11, 0.32, 0.84),  # Sky Blue
+        color=(0.11, 0.32, 0.84),
         morph=morph,
         fill_opacity=0.22,
     )
@@ -277,7 +273,22 @@ if uploaded_files:
                 for page_num in range(len(doc)):
                     page = doc[page_num]
                     process_report_page(page)
-                    combined_pdf.insert_pdf(doc, from_page=page_num, to_page=page_num)
+                    combined_pdf.insert_pdf(
+                        doc, from_page=page_num, to_page=page_num
+                    )
                     total_pages += 1
 
-            output_bytes =
+            output_bytes = io.BytesIO()
+            combined_pdf.save(output_bytes)
+            combined_pdf.close()
+
+            st.success(
+                f"✅ Done! Successfully processed all **{total_pages} page(s)** across **{len(uploaded_files)} report file(s)**."
+            )
+
+            st.download_button(
+                label="📥 Download Merged Dummy Report PDF",
+                data=output_bytes.getvalue(),
+                file_name="TruMed_Dummy_Report_Merged.pdf",
+                mime="application/pdf",
+            )
