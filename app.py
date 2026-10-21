@@ -113,23 +113,24 @@ def process_report_page(page):
         patient_redact_rect = fitz.Rect(18, y0, rect.width - 18, y0 + 82)
         page.add_redact_annot(patient_redact_rect, fill=(1, 1, 1))
 
-    # --- STEP 2: DYNAMIC SIGNATURE REDACTION ---
+    # --- STEP 2: DYNAMIC SIGNATURE SCRIBBLE REDACTION ---
+    # Target only the line where handwritten signatures overlap, leaving titles intact
     biochem_instances = page.search_for("BIOCHEMIST")
     path_instances = page.search_for("PATHOLOGIST")
 
     if biochem_instances:
         b_rect = biochem_instances[0]
-        sig_left_rect = fitz.Rect(20, b_rect.y0 - 45, 230, b_rect.y0 - 5)
+        sig_left_rect = fitz.Rect(20, b_rect.y0 - 35, 230, b_rect.y0 - 12)
         page.add_redact_annot(sig_left_rect, fill=(1, 1, 1))
 
     if path_instances:
         p_rect = path_instances[0]
         sig_right_rect = fitz.Rect(
-            rect.width - 240, p_rect.y0 - 45, rect.width - 20, p_rect.y0 - 5
+            rect.width - 240, p_rect.y0 - 35, rect.width - 20, p_rect.y0 - 12
         )
         page.add_redact_annot(sig_right_rect, fill=(1, 1, 1))
 
-    # Apply redactions to clear old text & signatures
+    # Apply redactions
     page.apply_redactions()
 
     # --- STEP 3: INSERT CLEAN DUMMY PATIENT METADATA ---
@@ -197,7 +198,7 @@ def process_report_page(page):
         color=(0, 0, 0),
     )
 
-    # --- STEP 4: RENDER TO IMAGE & APPLY DIAGONAL WATERMARK VIA PILLOW ---
+    # --- STEP 4: RENDER TO IMAGE & APPLY VISIBLE DIAGONAL WATERMARK ---
     pix = page.get_pixmap(dpi=200)
     img = Image.open(io.BytesIO(pix.tobytes("png"))).convert("RGBA")
     w, h = img.size
@@ -207,15 +208,15 @@ def process_report_page(page):
 
     watermark_text = "TRUMED DUMMY REPORT - FOR TRAINING ONLY"
     try:
-        font = ImageFont.truetype("arial.ttf", 64)
+        font = ImageFont.truetype("arial.ttf", 55)
     except IOError:
         font = ImageFont.load_default()
 
-    # Sky Blue with professional transparency
+    # Draw centered watermark text with clear visibility (Alpha = 65)
     text_draw.text(
-        (w // 14, h // 2.5),
+        (w // 12, h // 2.2),
         watermark_text,
-        fill=(29, 82, 216, 50),
+        fill=(29, 82, 216, 65),
         font=font,
     )
 
@@ -248,7 +249,7 @@ if uploaded_files:
 
     if st.button("🚀 Process & Generate Unified Dummy PDF"):
         with st.spinner(
-            "Sanitizing patient data, stripping signatures, watermarking, and merging all pages..."
+            "Sanitizing patient data, stripping signature lines, watermarking, and merging all pages..."
         ):
             combined_pdf = fitz.open()
             total_pages = 0
