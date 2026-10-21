@@ -1,6 +1,7 @@
 import io
 import os
 import fitz  # PyMuPDF
+from PIL import Image, ImageDraw, ImageFont
 import streamlit as st
 
 # --- PAGE CONFIGURATION ---
@@ -128,13 +129,12 @@ def process_report_page(page):
         )
         page.add_redact_annot(sig_right_rect, fill=(1, 1, 1))
 
-    # Apply redactions to entirely clear old underlying text & signatures
+    # Apply redactions to clear old text & signatures
     page.apply_redactions()
 
     # --- STEP 3: INSERT CLEAN DUMMY PATIENT METADATA ---
     base_y = y0
 
-    # Left Column Fields
     page.insert_text(
         fitz.Point(22, base_y + 12),
         "Patient Name : Mr. DUMMY PATIENT",
@@ -166,7 +166,6 @@ def process_report_page(page):
         color=(0, 0, 0),
     )
 
-    # Right Column Fields
     page.insert_text(
         fitz.Point(340, base_y + 12),
         "Sample Type : Serum",
@@ -198,20 +197,38 @@ def process_report_page(page):
         color=(0, 0, 0),
     )
 
-    # --- STEP 4: CRISP VECTOR WATERMARK VIA SHAPE (Supports arbitrary rotation & opacity) ---
-    shape = page.new_shape()
-    watermark_text = "TRUMED DUMMY REPORT - FOR TRAINING ONLY"
-    point = fitz.Point(rect.width * 0.12, rect.height * 0.58)
-    shape.insert_text(
-        point,
-        watermark_text,
-        fontsize=36,
-        color=(0.11, 0.32, 0.84),  # Sky Blue
-        rotate=30,
-    )
-    shape.commit(opacity=0.18)
+    # --- STEP 4: RENDER TO IMAGE & APPLY DIAGONAL WATERMARK VIA PILLOW ---
+    pix = page.get_pixmap(dpi=200)
+    img = Image.open(io.BytesIO(pix.tobytes("png"))).convert("RGBA")
+    w, h = img.size
 
-    return page.get_text("pdf")
+    text_img = Image.new("RGBA", (w, h), (255, 255, 255, 0))
+    text_draw = ImageDraw.Draw(text_img)
+
+    watermark_text = "TRUMED DUMMY REPORT - FOR TRAINING ONLY"
+    try:
+        font = ImageFont.truetype("arial.ttf", 64)
+    except IOError:
+        font = ImageFont.load_default()
+
+    # Sky Blue with professional transparency
+    text_draw.text(
+        (w // 14, h // 2.5),
+        watermark_text,
+        fill=(29, 82, 216, 50),
+        font=font,
+    )
+
+    rotated_watermark = text_img.rotate(30, expand=True)
+    px = (rotated_watermark.width - w) // 2
+    py = (rotated_watermark.height - h) // 2
+    cropped_watermark = rotated_watermark.crop((px, py, px + w, py + h))
+
+    final_img = Image.alpha_composite(img, cropped_watermark).convert("RGB")
+
+    pdf_bytes = io.BytesIO()
+    final_img.save(pdf_bytes, format="PDF", resolution=200)
+    return pdf_bytes.getvalue()
 
 
 # --- DASHBOARD CARD CONTAINER ---
