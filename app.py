@@ -105,42 +105,72 @@ st.markdown(
 def process_report_page(page):
     rect = page.rect
 
-    # --- STEP 1: MASK PATIENT DETAILS & REMOVE SIGNATURES/QR ---
+    # --- STEP 1: CLEANLY MASK PATIENT DETAILS & REMOVE SIGNATURES/QR ---
+    # Cover patient info header area cleanly with a white box
     page.draw_rect(
-        fitz.Rect(110, 85, 330, 115), color=(1, 1, 1), fill=(1, 1, 1)
-    )
-    page.draw_rect(
-        fitz.Rect(110, 135, 270, 155), color=(1, 1, 1), fill=(1, 1, 1)
-    )
-    page.draw_rect(
-        fitz.Rect(110, 155, 270, 175), color=(1, 1, 1), fill=(1, 1, 1)
-    )
-    page.draw_rect(
-        fitz.Rect(410, 100, 570, 125), color=(1, 1, 1), fill=(1, 1, 1)
+        fitz.Rect(18, 75, rect.width - 18, 190), color=(1, 1, 1), fill=(1, 1, 1)
     )
 
+    # Cover signature and QR code areas at the bottom
     page.draw_rect(
         fitz.Rect(
-            rect.width - 250, rect.height - 130, rect.width - 20, rect.height - 40
+            rect.width - 250, rect.height - 140, rect.width - 20, rect.height - 35
         ),
         color=(1, 1, 1),
         fill=(1, 1, 1),
     )
     page.draw_rect(
-        fitz.Rect(20, rect.height - 130, 220, rect.height - 50),
+        fitz.Rect(20, rect.height - 140, 240, rect.height - 40),
         color=(1, 1, 1),
         fill=(1, 1, 1),
     )
 
-    # --- STEP 2: INSERT DUMMY PLACEHOLDER TEXT ---
+    # --- STEP 2: INSERT CLEAN DUMMY PLACEHOLDER TEXT ---
     page.insert_text(
-        fitz.Point(115, 105), "DUMMY", fontsize=10, color=(0, 0, 0)
+        fitz.Point(25, 95),
+        "Patient Name : DUMMY PATIENT",
+        fontsize=10,
+        color=(0, 0, 0),
     )
-    page.insert_text(fitz.Point(115, 148), "XXX", fontsize=10, color=(0, 0, 0))
-    page.insert_text(fitz.Point(115, 168), "XXX", fontsize=10, color=(0, 0, 0))
-    page.insert_text(fitz.Point(415, 118), "XXX", fontsize=10, color=(0, 0, 0))
+    page.insert_text(
+        fitz.Point(25, 115),
+        "Age/Sex           : 30 Year(s) / General",
+        fontsize=10,
+        color=(0, 0, 0),
+    )
+    page.insert_text(
+        fitz.Point(25, 135), "Ref.Doctor      : XXX", fontsize=10, color=(0, 0, 0)
+    )
+    page.insert_text(
+        fitz.Point(25, 155),
+        "Ref.Customer   : XXX",
+        fontsize=10,
+        color=(0, 0, 0),
+    )
 
-    # --- STEP 3: RENDER TO HIGH-RES IMAGE & WATERMARK ---
+    page.insert_text(
+        fitz.Point(350, 95), "SID/PID    : XXX", fontsize=10, color=(0, 0, 0)
+    )
+    page.insert_text(
+        fitz.Point(350, 115),
+        "Collected  : 2026-10-21 10:00:00",
+        fontsize=10,
+        color=(0, 0, 0),
+    )
+    page.insert_text(
+        fitz.Point(350, 135),
+        "Registered : 2026-10-21 11:00:00",
+        fontsize=10,
+        color=(0, 0, 0),
+    )
+    page.insert_text(
+        fitz.Point(350, 155),
+        "Reported   : 2026-10-21 12:00:00",
+        fontsize=10,
+        color=(0, 0, 0),
+    )
+
+    # --- STEP 3: RENDER TO HIGH-RES IMAGE & ADD CLEAR WATERMARK ---
     pix = page.get_pixmap(dpi=250)
     img = Image.open(io.BytesIO(pix.tobytes("png"))).convert("RGBA")
     w, h = img.size
@@ -148,17 +178,21 @@ def process_report_page(page):
     text_img = Image.new("RGBA", (w, h), (255, 255, 255, 0))
     text_draw = ImageDraw.Draw(text_img)
 
-    watermark_text = "TruMed's Dummy Report Generator"
+    watermark_text = "TRUMED DUMMY REPORT - FOR TRAINING ONLY"
     try:
-        font = ImageFont.truetype("arial.ttf", int(w * 0.05))
+        font = ImageFont.truetype("arial.ttf", int(w * 0.04))
     except IOError:
         font = ImageFont.load_default()
 
+    # Draw a clear, visible watermark across the middle
     text_draw.text(
-        (w // 4, h // 2), watermark_text, fill=(160, 160, 160, 80), font=font
+        (w // 6, h // 2.2),
+        watermark_text,
+        fill=(130, 130, 130, 110),
+        font=font,
     )
 
-    rotated_watermark = text_img.rotate(32, expand=True)
+    rotated_watermark = text_img.rotate(30, expand=True)
     px = (rotated_watermark.width - w) // 2
     py = (rotated_watermark.height - h) // 2
     cropped_watermark = rotated_watermark.crop((px, py, px + w, py + h))
