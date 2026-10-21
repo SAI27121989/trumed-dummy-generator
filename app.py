@@ -105,8 +105,8 @@ def process_report_page(page):
     rect = page.rect
 
     # --- STEP 1: DYNAMIC PATIENT HEADER REDACTION ---
-    # Find keyword locations to determine exact boundaries dynamically
     p_name_instances = page.search_for("Patient Name")
+    y0 = 75
     if p_name_instances:
         y0 = p_name_instances[0].y0 - 5
         patient_redact_rect = fitz.Rect(18, y0, rect.width - 18, y0 + 82)
@@ -132,7 +132,7 @@ def process_report_page(page):
     page.apply_redactions()
 
     # --- STEP 3: INSERT CLEAN DUMMY PATIENT METADATA ---
-    base_y = y0 if p_name_instances else 75
+    base_y = y0
 
     # Left Column Fields
     page.insert_text(
@@ -198,17 +198,18 @@ def process_report_page(page):
         color=(0, 0, 0),
     )
 
-    # --- STEP 4: CRISP VECTOR WATERMARK ---
+    # --- STEP 4: CRISP VECTOR WATERMARK VIA SHAPE (Supports arbitrary rotation & opacity) ---
+    shape = page.new_shape()
     watermark_text = "TRUMED DUMMY REPORT - FOR TRAINING ONLY"
-    point = fitz.Point(rect.width * 0.15, rect.height * 0.55)
-    page.insert_text(
+    point = fitz.Point(rect.width * 0.12, rect.height * 0.58)
+    shape.insert_text(
         point,
         watermark_text,
-        fontsize=38,
+        fontsize=36,
         color=(0.11, 0.32, 0.84),  # Sky Blue
         rotate=30,
-        fill_opacity=0.18,
     )
+    shape.commit(opacity=0.18)
 
     return page.get_text("pdf")
 
