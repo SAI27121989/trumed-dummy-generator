@@ -11,7 +11,7 @@ st.set_page_config(
     layout="wide",
 )
 
-# --- HEADER SECTION WITH EXACT REFERENCE BRANDING ---
+# --- HEADER SECTION ---
 logo_html = ""
 logo_path = "logo.png"
 if not os.path.exists(logo_path) and os.path.exists("logo.png.jpg"):
@@ -105,12 +105,12 @@ st.markdown(
 def process_report_page(page):
     rect = page.rect
 
-    # --- STEP 1: CLEANLY MASK PATIENT DETAILS AREA ---
+    # --- STEP 1: PRECISELY MASK ONLY PATIENT METADATA (Preserves Top Header & Logo) ---
     page.draw_rect(
-        fitz.Rect(18, 70, rect.width - 18, 175), color=(1, 1, 1), fill=(1, 1, 1)
+        fitz.Rect(18, 105, rect.width - 18, 172), color=(1, 1, 1), fill=(1, 1, 1)
     )
 
-    # --- STEP 2: CLEANLY MASK DOCTOR SIGNATURES (Keeping names & footers intact) ---
+    # --- STEP 2: PRECISELY MASK DOCTOR SIGNATURES (Keeping footer text intact) ---
     page.draw_rect(
         fitz.Rect(20, rect.height - 215, 230, rect.height - 165),
         color=(1, 1, 1),
@@ -127,51 +127,51 @@ def process_report_page(page):
     # --- STEP 3: INSERT EXACT DUMMY PATIENT METADATA ---
     # Left Column Fields
     page.insert_text(
-        fitz.Point(22, 85),
+        fitz.Point(22, 118),
         "Patient Name : Mr. DUMMY PATIENT",
         fontsize=9.5,
         color=(0, 0, 0),
     )
     page.insert_text(
-        fitz.Point(22, 102),
+        fitz.Point(22, 133),
         "Age/Sex           : 30 Year(s) / Male",
         fontsize=9.5,
         color=(0, 0, 0),
     )
     page.insert_text(
-        fitz.Point(22, 119), "Ref.Doctor      : XXX", fontsize=9.5, color=(0, 0, 0)
+        fitz.Point(22, 148), "Ref.Doctor      : XXX", fontsize=9.5, color=(0, 0, 0)
     )
     page.insert_text(
-        fitz.Point(22, 136),
+        fitz.Point(22, 163),
         "Ref.Customer   : XXX",
         fontsize=9.5,
         color=(0, 0, 0),
     )
     page.insert_text(
-        fitz.Point(22, 153), "TPL Code         : XXX", fontsize=9.5, color=(0, 0, 0)
+        fitz.Point(22, 178), "TPL Code         : XXX", fontsize=9.5, color=(0, 0, 0)
     )
 
     # Right Column Fields
     page.insert_text(
-        fitz.Point(340, 85), "Sample Type : Serum", fontsize=9.5, color=(0, 0, 0)
+        fitz.Point(340, 118), "Sample Type : Serum", fontsize=9.5, color=(0, 0, 0)
     )
     page.insert_text(
-        fitz.Point(340, 102), "SID/PID        : XXX", fontsize=9.5, color=(0, 0, 0)
+        fitz.Point(340, 133), "SID/PID        : XXX", fontsize=9.5, color=(0, 0, 0)
     )
     page.insert_text(
-        fitz.Point(340, 119),
+        fitz.Point(340, 148),
         "Collected on : 2026-10-21 10:00:00",
         fontsize=9.5,
         color=(0, 0, 0),
     )
     page.insert_text(
-        fitz.Point(340, 136),
+        fitz.Point(340, 163),
         "Registered on : 2026-10-21 11:00:00",
         fontsize=9.5,
         color=(0, 0, 0),
     )
     page.insert_text(
-        fitz.Point(340, 153),
+        fitz.Point(340, 178),
         "Reported on   : 2026-10-21 12:00:00",
         fontsize=9.5,
         color=(0, 0, 0),
