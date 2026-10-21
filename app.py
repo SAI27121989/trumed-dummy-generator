@@ -119,24 +119,10 @@ def process_report_page(page):
     header_rect = fitz.Rect(18, y0, rect.width - 18, y_end)
     page.add_redact_annot(header_rect, fill=(1, 1, 1))
 
-    # --- STEP 2: SIGNATURE ZONE REDACTION & RE-STAMPING ---
-    biochem_instances = page.search_for("BIOCHEMIST")
-    path_instances = page.search_for("PATHOLOGIST")
-
-    b_y = rect.height - 100
-    p_y = rect.height - 100
-
-    if biochem_instances:
-        b_y = biochem_instances[0].y0
-        sig_left_rect = fitz.Rect(20, b_y - 45, 240, b_y + 12)
-        page.add_redact_annot(sig_left_rect, fill=(1, 1, 1))
-
-    if path_instances:
-        p_y = path_instances[0].y0
-        sig_right_rect = fitz.Rect(
-            rect.width - 250, p_y - 45, rect.width - 20, p_y + 12
-        )
-        page.add_redact_annot(sig_right_rect, fill=(1, 1, 1))
+    # --- STEP 2: COMPLETE BOTTOM FOOTER WIPE (NO SIGNS, NO DISCLAIMERS) ---
+    footer_y_start = rect.height - 110
+    footer_rect = fitz.Rect(18, footer_y_start, rect.width - 18, rect.height - 15)
+    page.add_redact_annot(footer_rect, fill=(1, 1, 1))
 
     page.apply_redactions()
 
@@ -215,49 +201,22 @@ def process_report_page(page):
         color=(0, 0, 0),
     )
 
-    # --- STEP 4: RE-STAMP CLEAN DOCTOR NAMES & TITLES ---
-    page.insert_text(
-        fitz.Point(22, b_y - 10),
-        "CH Samuel",
-        fontsize=10,
-        fontname="helv",
-        color=(0, 0, 0),
-    )
-    page.insert_text(
-        fitz.Point(22, b_y + 5),
-        "BIOCHEMIST",
-        fontsize=9,
-        fontname="helv",
-        color=(0, 0, 0),
-    )
-
-    page.insert_text(
-        fitz.Point(rect.width - 200, p_y - 10),
-        "Dr R Harshavardhini",
-        fontsize=10,
-        fontname="helv",
-        color=(0, 0, 0),
-    )
-    page.insert_text(
-        fitz.Point(rect.width - 200, p_y + 5),
-        "DNB PATHOLOGIST",
-        fontsize=9,
-        fontname="helv",
-        color=(0, 0, 0),
-    )
-
-    # --- STEP 5: TRUMED DUMMY REPORT WATERMARK ---
-    watermark_text = "TRUMED DUMMY REPORT"
-    center_point = fitz.Point(rect.width * 0.15, rect.height * 0.55)
-    morph = (center_point, fitz.Matrix(25))
+    # --- STEP 4: FIT-TO-PAGE CASE-SENSITIVE WATERMARK ---
+    watermark_text = "TruMed's DUMMY REPORT"
+    center_point = fitz.Point(rect.width * 0.3, rect.height * 0.6)
+    
+    # Calculate proportional font size based on page width
+    dynamic_fontsize = int(rect.width / 15)
+    
+    morph = (center_point, fitz.Matrix(30))
     page.insert_text(
         center_point,
         watermark_text,
-        fontsize=28,
+        fontsize=dynamic_fontsize,
         fontname="helv",
-        color=(0.11, 0.32, 0.84),
+        color=(0.11, 0.32, 0.84),  # Professional Blue
         morph=morph,
-        fill_opacity=0.20,
+        fill_opacity=0.18,
     )
 
 
@@ -277,7 +236,9 @@ if uploaded_files:
     )
 
     if st.button("🚀 Process & Generate Unified Dummy PDF"):
-        with st.spinner("Processing reports and stamping watermarks..."):
+        with st.spinner(
+            "Sanitizing headers, clearing footers, applying fit-to-page watermarks..."
+        ):
             combined_pdf = fitz.open()
             total_pages = 0
 
