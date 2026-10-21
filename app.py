@@ -105,72 +105,72 @@ st.markdown(
 def process_report_page(page):
     rect = page.rect
 
-    # --- STEP 1: CLEANLY MASK PATIENT DETAILS & REMOVE SIGNATURES/QR ---
-    # Cover patient info header area cleanly with a white box
+    # --- STEP 1: PRECISELY MASK ONLY PATIENT INFO & SIGNATURE/QR AREAS ---
+    # Covers patient header info safely above the biochemistry table
     page.draw_rect(
-        fitz.Rect(18, 75, rect.width - 18, 190), color=(1, 1, 1), fill=(1, 1, 1)
+        fitz.Rect(18, 75, rect.width - 18, 172), color=(1, 1, 1), fill=(1, 1, 1)
     )
 
-    # Cover signature and QR code areas at the bottom
+    # Covers bottom signature and QR code blocks without touching text footers
     page.draw_rect(
         fitz.Rect(
-            rect.width - 250, rect.height - 140, rect.width - 20, rect.height - 35
+            rect.width - 230, rect.height - 180, rect.width - 20, rect.height - 90
         ),
         color=(1, 1, 1),
         fill=(1, 1, 1),
     )
     page.draw_rect(
-        fitz.Rect(20, rect.height - 140, 240, rect.height - 40),
+        fitz.Rect(20, rect.height - 180, 220, rect.height - 90),
         color=(1, 1, 1),
         fill=(1, 1, 1),
     )
 
     # --- STEP 2: INSERT CLEAN DUMMY PLACEHOLDER TEXT ---
     page.insert_text(
-        fitz.Point(25, 95),
+        fitz.Point(25, 93),
         "Patient Name : DUMMY PATIENT",
-        fontsize=10,
+        fontsize=9.5,
         color=(0, 0, 0),
     )
     page.insert_text(
-        fitz.Point(25, 115),
+        fitz.Point(25, 113),
         "Age/Sex           : 30 Year(s) / General",
-        fontsize=10,
+        fontsize=9.5,
         color=(0, 0, 0),
     )
     page.insert_text(
-        fitz.Point(25, 135), "Ref.Doctor      : XXX", fontsize=10, color=(0, 0, 0)
+        fitz.Point(25, 133), "Ref.Doctor      : XXX", fontsize=9.5, color=(0, 0, 0)
     )
     page.insert_text(
-        fitz.Point(25, 155),
+        fitz.Point(25, 153),
         "Ref.Customer   : XXX",
-        fontsize=10,
+        fontsize=9.5,
         color=(0, 0, 0),
     )
 
     page.insert_text(
-        fitz.Point(350, 95), "SID/PID    : XXX", fontsize=10, color=(0, 0, 0)
+        fitz.Point(340, 93), "SID/PID    : XXX", fontsize=9.5, color=(0, 0, 0)
     )
     page.insert_text(
-        fitz.Point(350, 115),
+        fitz.Point(340, 113),
         "Collected  : 2026-10-21 10:00:00",
-        fontsize=10,
+        fontsize=9.5,
         color=(0, 0, 0),
     )
     page.insert_text(
-        fitz.Point(350, 135),
+        fitz.Point(340, 133),
         "Registered : 2026-10-21 11:00:00",
-        fontsize=10,
+        fontsize=9.5,
         color=(0, 0, 0),
     )
     page.insert_text(
-        fitz.Point(350, 155),
+        fitz.Point(340, 153),
         "Reported   : 2026-10-21 12:00:00",
-        fontsize=10,
+        fontsize=9.5,
         color=(0, 0, 0),
     )
 
-    # --- STEP 3: RENDER TO HIGH-RES IMAGE & ADD CLEAR WATERMARK ---
+    # --- STEP 3: RENDER TO HIGH-RES IMAGE & ADD WATERMARK ---
     pix = page.get_pixmap(dpi=250)
     img = Image.open(io.BytesIO(pix.tobytes("png"))).convert("RGBA")
     w, h = img.size
@@ -184,11 +184,10 @@ def process_report_page(page):
     except IOError:
         font = ImageFont.load_default()
 
-    # Draw a clear, visible watermark across the middle
     text_draw.text(
         (w // 6, h // 2.2),
         watermark_text,
-        fill=(130, 130, 130, 110),
+        fill=(150, 150, 150, 90),
         font=font,
     )
 
