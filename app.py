@@ -3,14 +3,16 @@ import os
 import fitz  # PyMuPDF
 import streamlit as st
 
-# --- PAGE CONFIGURATION ---
+# ==========================================
+# 1. STREAMLIT PAGE CONFIGURATION & STYLING
+# ==========================================
 st.set_page_config(
     page_title="TruMed Path Labs - Dummy Report Generator",
     page_icon="🧪",
     layout="wide",
 )
 
-# --- HEADER SECTION ---
+# Load logo safely if available
 logo_html = ""
 logo_path = "logo.png"
 if not os.path.exists(logo_path) and os.path.exists("logo.png.jpg"):
@@ -23,6 +25,7 @@ if os.path.exists(logo_path):
         encoded_logo = base64.b64encode(image_file.read()).decode()
     logo_html = f'<img src="data:image/png;base64,{encoded_logo}" style="max-height: 85px; background: white; padding: 10px; border-radius: 12px; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">'
 
+# Render custom UI banner
 st.markdown(
     f"""
     <style>
@@ -101,127 +104,68 @@ st.markdown(
 )
 
 
+# ==========================================
+# 2. CORE PDF PROCESSING LOGIC
+# ==========================================
+def process_metadata_field(page, keyword, new_value, x_offset=2, width=150):
+    """Helper function to search for a metadata keyword, redact its old value,
+
+    and write the new dummy value cleanly in place.
+    """
+    matches = page.search_for(keyword)
+    if matches:
+        r = matches[0]
+        # Define rectangle covering the old value space next to the label
+        old_box = fitz.Rect(r.x1 + x_offset, r.y0 - 1, r.x1 + width, r.y1 + 1)
+        page.add_redact_annot(old_box, fill=(1, 1, 1))
+        page.apply_redactions()
+
+        # Write the new dummy value
+        page.insert_text(
+            fitz.Point(r.x1 + x_offset + 3, r.y1 - 1),
+            new_value,
+            fontsize=9,
+            fontname="helv",
+            color=(0, 0, 0),
+        )
+
+
 def process_report_page(page):
+    """Processes a single page:
+
+    1. Updates Patient Name, Ref.Customer, TPL Code, and SID/PID.
+    2. Erases bottom signatures, doctor sign-offs, and QR verification notes.
+    """
     rect = page.rect
 
-    # --- STEP 1: PRECISE BOUNDED HEADER REDACTION ---
-    p_name_instances = page.search_for("Patient Name")
-    test_desc_instances = page.search_for("TEST DESCRIPTION")
+    # --- STEP 1: IN-PLACE SURGICAL METADATA UPDATES ---
+    process_metadata_field(page, "Patient Name", ": Mr DUMMY", width=180)
+    process_metadata_field(page, "Ref.Customer", ": XXX", width=100)
+    process_metadata_field(page, "TPL Code", ": XXX", width=100)
+    process_metadata_field(page, "SID/PID", ": XXX", width=100)
 
-    y0 = 75
-    y_end = 165
+    # --- STEP 2: REMOVE BOTTOM SIGNATURES, DOCTOR DETAILS & QR CODES ---
+    # Wipes everything from 110 points above the bottom margin down to the bottom
+    footer_wipe_start = rect.height - 110
+    footer_wipe_rect = fitz.Rect(0, footer_wipe_start, rect.width, rect.height)
+    page.add_redact_annot(footer_wipe_rect, fill=(1, 1, 1))
 
-    if p_name_instances:
-        y0 = p_name_instances[0].y0 - 4
-    if test_desc_instances:
-        y_end = test_desc_instances[0].y0 - 2
-
-    header_rect = fitz.Rect(18, y0, rect.width - 18, y_end)
-    page.add_redact_annot(header_rect, fill=(1, 1, 1))
-
-    # --- STEP 2: ABSOLUTE FIXED FOOTER WIPE (100% REMOVAL OF ALL SIGNS & DISCLAIMERS) ---
-    footer_y_start = rect.height - 125
-    footer_rect = fitz.Rect(18, footer_y_start, rect.width - 18, rect.height - 10)
-    page.add_redact_annot(footer_rect, fill=(1, 1, 1))
+    # Also clean up any top QR code badge ("scan to download") if present
+    top_qr_rects = page.search_for("scan to download")
+    if top_qr_rects:
+        qr_r = top_qr_rects[0]
+        qr_box = fitz.Rect(qr_r.x0 - 5, qr_r.y0 - 45, qr_r.x1 + 5, qr_r.y1 + 5)
+        page.add_redact_annot(qr_box, fill=(1, 1, 1))
 
     page.apply_redactions()
 
-    # --- STEP 3: INSERT CLEAN DUMMY PATIENT METADATA ---
-    base_y = y0 + 2
 
-    page.insert_text(
-        fitz.Point(22, base_y + 12),
-        "Patient Name : Mr. DUMMY PATIENT",
-        fontsize=9.5,
-        fontname="helv",
-        color=(0, 0, 0),
-    )
-    page.insert_text(
-        fitz.Point(22, base_y + 28),
-        "Age/Sex           : 30 Year(s) / Male",
-        fontsize=9.5,
-        fontname="helv",
-        color=(0, 0, 0),
-    )
-    page.insert_text(
-        fitz.Point(22, base_y + 44),
-        "Ref.Doctor      : XXX",
-        fontsize=9.5,
-        fontname="helv",
-        color=(0, 0, 0),
-    )
-    page.insert_text(
-        fitz.Point(22, base_y + 60),
-        "Ref.Customer   : XXX",
-        fontsize=9.5,
-        fontname="helv",
-        color=(0, 0, 0),
-    )
-    page.insert_text(
-        fitz.Point(22, base_y + 76),
-        "TPL Code         : XXX",
-        fontsize=9.5,
-        fontname="helv",
-        color=(0, 0, 0),
-    )
-
-    page.insert_text(
-        fitz.Point(340, base_y + 12),
-        "Sample Type : Serum",
-        fontsize=9.5,
-        fontname="helv",
-        color=(0, 0, 0),
-    )
-    page.insert_text(
-        fitz.Point(340, base_y + 28),
-        "SID/PID        : XXX",
-        fontsize=9.5,
-        fontname="helv",
-        color=(0, 0, 0),
-    )
-    page.insert_text(
-        fitz.Point(340, base_y + 44),
-        "Collected on : 2026-10-21 10:00:00",
-        fontsize=9.5,
-        fontname="helv",
-        color=(0, 0, 0),
-    )
-    page.insert_text(
-        fitz.Point(340, base_y + 60),
-        "Registered on : 2026-10-21 11:00:00",
-        fontsize=9.5,
-        fontname="helv",
-        color=(0, 0, 0),
-    )
-    page.insert_text(
-        fitz.Point(340, base_y + 76),
-        "Reported on   : 2026-10-21 12:00:00",
-        fontsize=9.5,
-        fontname="helv",
-        color=(0, 0, 0),
-    )
-
-    # --- STEP 4: BOLD, CASE-SENSITIVE WATERMARK ---
-    watermark_text = "TruMed's DUMMY REPORT"
-    center_point = fitz.Point(rect.width * 0.5, rect.height * 0.5)
-
-    dynamic_fontsize = int(rect.width / 12)
-    morph = (center_point, fitz.Matrix(35))
-    page.insert_text(
-        center_point,
-        watermark_text,
-        fontsize=dynamic_fontsize,
-        fontname="hebo",  # Helvetica-Bold
-        color=(0.11, 0.32, 0.84),
-        morph=morph,
-        fill_opacity=0.15,
-    )
-
-
-# --- DASHBOARD CARD CONTAINER ---
+# ==========================================
+# 3. STREAMLIT FILE UPLOADER & UI DASHBOARD
+# ==========================================
 st.subheader("📁 Upload Lab Reports")
 st.write(
-    "Select individual reports, attachments, or multi-page PDF profiles to generate a merged, locked dummy PDF."
+    "Upload your original PDF report(s) below to automatically sanitize patient details and remove signatures/QR codes."
 )
 
 uploaded_files = st.file_uploader(
@@ -233,9 +177,9 @@ if uploaded_files:
         f"📋 **{len(uploaded_files)} file(s)** uploaded and ready for processing."
     )
 
-    if st.button("🚀 Process & Generate Unified Dummy PDF"):
+    if st.button("🚀 Process & Generate Clean Dummy PDF"):
         with st.spinner(
-            "Sanitizing headers, wiping footers absolutely, applying full-page watermarks..."
+            "Executing surgical metadata updates and removing signatures..."
         ):
             combined_pdf = fitz.open()
             total_pages = 0
@@ -251,17 +195,19 @@ if uploaded_files:
                     )
                     total_pages += 1
 
+            # Save to memory bytes container
             output_bytes = io.BytesIO()
             combined_pdf.save(output_bytes)
             combined_pdf.close()
 
             st.success(
-                f"✅ Done! Successfully processed all **{total_pages} page(s)** across **{len(uploaded_files)} report file(s)**."
+                f"✅ Done! Successfully processed all **{total_pages} page(s)**."
             )
 
+            # Download button for the output file
             st.download_button(
-                label="📥 Download Merged Dummy Report PDF",
+                label="📥 Download Processed Dummy Report PDF",
                 data=output_bytes.getvalue(),
-                file_name="TruMed_Dummy_Report_Merged.pdf",
+                file_name="TruMed_Dummy_Report_Clean.pdf",
                 mime="application/pdf",
             )
