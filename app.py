@@ -11,118 +11,32 @@ st.set_page_config(
     layout="wide",
 )
 
-# --- CUSTOM BRANDING CSS (Royal Blue #1D52D8 & Gold #FF9F00) ---
-st.markdown(
-    """
-    <style>
-    /* Global Page Background */
-    .main {
-        background-color: #F4F6FB;
-    }
-    
-    /* Header Banner Styling */
-    .trumed-header {
-        background-color: #1D52D8;
-        color: white;
-        padding: 20px 30px;
-        border-radius: 10px 10px 0px 0px;
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-    }
-    
-    .header-left {
-        display: flex;
-        align-items: center;
-        gap: 20px;
-    }
-    
-    .logo-img {
-        background-color: white;
-        padding: 8px;
-        border-radius: 8px;
-        max-height: 65px;
-    }
-    
-    .trumed-header h1 {
-        color: white;
-        font-size: 26px;
-        font-weight: 700;
-        margin: 0;
-    }
-    
-    .trumed-header p {
-        color: #E2E8F0;
-        font-size: 13px;
-        margin: 4px 0 0 0;
-    }
-    
-    .nabl-badge {
-        background-color: #FF9F00;
-        color: #0F172A;
-        font-weight: 800;
-        padding: 8px 16px;
-        border-radius: 20px;
-        font-size: 13px;
-        letter-spacing: 0.5px;
-        white-space: nowrap;
-    }
+# --- HEADER SECTION (Using Native Streamlit for zero errors) ---
+col_logo, col_text, col_badge = st.columns([1, 4, 1.5])
 
-    /* Card Container */
-    .card-container {
-        background-color: #FFFFFF;
-        padding: 30px;
-        border-radius: 0px 0px 10px 10px;
-        box-shadow: 0px 4px 12px rgba(0, 0, 0, 0.05);
-        margin-bottom: 25px;
-    }
-    
-    /* Primary Processing Button */
-    .stButton>button {
-        background-color: #1D52D8;
-        color: white;
-        font-weight: 600;
-        font-size: 16px;
-        border-radius: 6px;
-        border: none;
-        padding: 12px 28px;
-        width: 100%;
-    }
-    .stButton>button:hover {
-        background-color: #153EB1;
-        color: white;
-    }
-    </style>
-    """,
-    unsafe_allow_html=True,
-)
+with col_logo:
+    # Checks for either logo.png or logo.png.jpg
+    logo_path = "logo.png"
+    if not os.path.exists(logo_path) and os.path.exists("logo.png.jpg"):
+        logo_path = "logo.png.jpg"
 
-# --- HEADER SECTION ---
-logo_html = ""
-if os.path.exists("logo.png"):
-    import base64
+    if os.path.exists(logo_path):
+        st.image(logo_path, width=90)
 
-    with open("logo.png", "rb") as image_file:
-        encoded_logo = base64.b64encode(image_file.read()).decode()
-    logo_html = f'<img src="data:image/png;base64,{encoded_logo}" class="logo-img">'
+with col_text:
+    st.markdown(
+        "### **TruMed Path Labs India Pvt Ltd.**\n"
+        "📍 Central Lab: Plot No. 32, Umakanth Arcade, Vasavi Nagar Colony, Secunderabad - 500015  \n"
+        "📞 Helpline: +91 7036363689"
+    )
 
-st.markdown(
-    f"""
-    <div class="trumed-header">
-        <div class="header-left">
-            {logo_html}
-            <div>
-                <h1>TruMed Path Labs India Pvt Ltd.</h1>
-                <p>📍 Central Lab: Plot No. 32, Umakanth Arcade, Vasavi Nagar Colony, Secunderabad - 500015 | 📞 Helpline: +91 7036363689</p>
-            </div>
-        </div>
-        <div class="nabl-badge">
-            🏅 NABL ACCREDITED LAB
-        </div>
-    </div>
-""",
-    unsafe_allow_html=True,
-)
+with col_badge:
+    st.markdown(
+        "<div style='background-color: #FF9F00; color: #0F172A; text-align: center; font-weight: 800; padding: 10px 15px; border-radius: 20px; font-size: 13px; margin-top: 10px;'>🏅 NABL ACCREDITED LAB</div>",
+        unsafe_allow_html=True,
+    )
+
+st.divider()
 
 
 def process_report_page(page):
@@ -203,8 +117,6 @@ def process_report_page(page):
 
 
 # --- DASHBOARD CARD CONTAINER ---
-st.markdown('<div class="card-container">', unsafe_allow_html=True)
-
 st.subheader("📁 Upload Lab Reports")
 st.write(
     "Select individual reports, attachments, or multi-page PDF profiles to generate a merged, locked dummy PDF."
@@ -252,5 +164,3 @@ if uploaded_files:
                 file_name="TruMed_Dummy_Report_Merged.pdf",
                 mime="application/pdf",
             )
-
-st.markdown("</div>", unsafe_allow_html=True)
