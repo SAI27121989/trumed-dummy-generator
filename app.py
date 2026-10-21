@@ -103,30 +103,8 @@ st.markdown(
 
 
 # ==========================================
-# 2. SURGICAL REDACTION & WATERMARK ENGINE
+# 2. ROBUST REDACTION & WATERMARK ENGINE
 # ==========================================
-def replace_value_inline(
-    page, keyword, new_text, font_name="helv", is_bold=False
-):
-    """Finds exact text label and replaces only the value coordinate to right of label."""
-    matches = page.search_for(keyword)
-    if matches:
-        r = matches[0]
-        # Bounding box for old value
-        val_box = fitz.Rect(r.x1 + 2, r.y0 - 1, r.x1 + 220, r.y1 + 1)
-        page.add_redact_annot(val_box, fill=(1, 1, 1))
-        page.apply_redactions()
-
-        fname = "helv-bold" if is_bold else font_name
-        page.insert_text(
-            fitz.Point(r.x1 + 4, r.y1 - 1),
-            new_text,
-            fontsize=9,
-            fontname=fname,
-            color=(0, 0, 0),
-        )
-
-
 def apply_dummy_watermark(page):
     """Applies centered 35-degree angled watermark 'TruMed's DUMMY REPORT'."""
     rect = page.rect
@@ -134,41 +112,46 @@ def apply_dummy_watermark(page):
     center_point = fitz.Point(rect.width * 0.5, rect.height * 0.5)
 
     fontsize = int(rect.width / 13)
-    morph = (center_point, fitz.Matrix(35))  # 35 degree rotation
+    morph = (center_point, fitz.Matrix(35))
 
     page.insert_text(
         center_point,
         watermark_text,
         fontsize=fontsize,
-        fontname="hebo",  # Helvetica-Bold
-        color=(0.11, 0.32, 0.84),  # TruMed Blue
+        fontname="hebo",
+        color=(0.11, 0.32, 0.84),
         morph=morph,
         fill_opacity=0.15,
     )
 
 
 def process_report_page(page):
-    """Executes surgical updates, signature/QR redactions, and adds watermark."""
-    rect = page.rect
+    """Safely collects redactions, applies them in batch, inserts text, and watermarks."""
+    # List of metadata mappings to replace: (Keyword, New Value, Is Bold)
+    replacements = [
+        ("Patient Name", ": Mr DUMMY", True),
+        ("Ref.Doctor", ": XXX", False),
+        ("Ref.Customer", ": XXX", False),
+        ("TPL Code", ": XXX", False),
+        ("SID/PID", ": XXX", False),
+    ]
 
-    # --- STEP 1: IN-PLACE METADATA SWAP ---
-    replace_value_inline(
-        page, "Patient Name", ": Mr DUMMY", font_name="helv", is_bold=True
-    )
-    replace_value_inline(page, "Ref.Doctor", ": XXX")
-    replace_value_inline(page, "Ref.Customer", ": XXX")
-    replace_value_inline(page, "TPL Code", ": XXX")
-    replace_value_inline(page, "SID/PID", ": XXX")
+    # 1. Add redaction annotations for metadata fields
+    for keyword, _, _ in replacements:
+        matches = page.search_for(keyword)
+        if matches:
+            r = matches[0]
+            val_box = fitz.Rect(r.x1 + 2, r.y0 - 2, r.x1 + 220, r.y1 + 2)
+            page.add_redact_annot(val_box, fill=(1, 1, 1))
 
-    # --- STEP 2: REMOVE SIGNATURES & QR CODES ---
-    # Top header QR code block ("scan to download")
+    # 2. Add redaction for top QR code block ("scan to download")
     top_qr = page.search_for("scan to download")
     if top_qr:
         qr_r = top_qr[0]
         qr_box = fitz.Rect(qr_r.x0 - 10, qr_r.y0 - 50, qr_r.x1 + 10, qr_r.y1 + 10)
         page.add_redact_annot(qr_box, fill=(1, 1, 1))
 
-    # Bottom signatures redaction zone (doctor names & signatures)
+    # 3. Add redaction for bottom doctor signatures & designations
     doc_signs = page.search_for("PATHOLOGIST") + page.search_for("BIOCHEMIST")
     for sign_rect in doc_signs:
         sig_box = fitz.Rect(
@@ -179,10 +162,24 @@ def process_report_page(page):
         )
         page.add_redact_annot(sig_box, fill=(1, 1, 1))
 
-    # Apply all redactions
+    # 4. Apply all collected redactions simultaneously
     page.apply_redactions()
 
-    # --- STEP 3: APPLY WATERMARK ---
+    # 5. Insert replacement text cleanly after redaction layer is committed
+    for keyword, new_text, is_bold in replacements:
+        matches = page.search_for(keyword)
+        if matches:
+            r = matches[0]
+            font_name = "helv-bold" if is_bold else "helv"
+            page.insert_text(
+                fitz.Point(r.x1 + 4, r.y1 - 1),
+                new_text,
+                fontsize=9,
+                fontname=font_name,
+                color=(0, 0, 0),
+            )
+
+    # 6. Apply Watermark
     apply_dummy_watermark(page)
 
 
