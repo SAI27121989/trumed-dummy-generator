@@ -116,15 +116,15 @@ def process_report_page(page):
         fill=(1, 1, 1),
     )
 
-    # --- STEP 2: PRECISELY MASK HANDWRITTEN SIGNATURES ABOVE NAMES ---
+    # --- STEP 2: PRECISELY MASK DOCTOR SIGNATURES (Leaving names & footers visible) ---
     page.draw_rect(
-        fitz.Rect(20, rect.height - 185, 250, rect.height - 125),
+        fitz.Rect(25, rect.height - 215, 235, rect.height - 160),
         color=(1, 1, 1),
         fill=(1, 1, 1),
     )
     page.draw_rect(
         fitz.Rect(
-            rect.width - 270, rect.height - 185, rect.width - 20, rect.height - 125
+            rect.width - 250, rect.height - 215, rect.width - 20, rect.height - 160
         ),
         color=(1, 1, 1),
         fill=(1, 1, 1),
@@ -175,7 +175,7 @@ def process_report_page(page):
         color=(0, 0, 0),
     )
 
-    # --- STEP 4: RENDER TO HIGH-RES IMAGE & ADD CLEAR WATERMARK ---
+    # --- STEP 4: RENDER TO HIGH-RES IMAGE & ADD SKY BLUE WATERMAP (SIZE 72) ---
     pix = page.get_pixmap(dpi=250)
     img = Image.open(io.BytesIO(pix.tobytes("png"))).convert("RGBA")
     w, h = img.size
@@ -185,15 +185,15 @@ def process_report_page(page):
 
     watermark_text = "TRUMED DUMMY REPORT - FOR TRAINING ONLY"
     try:
-        font = ImageFont.truetype("arial.ttf", int(w * 0.045))
+        font = ImageFont.truetype("arial.ttf", 72)
     except IOError:
         font = ImageFont.load_default()
 
-    # Draw a prominent, clearly visible gray watermark across the center
+    # Sky Blue color with professional transparency (R=29, G=82, B=216, Alpha=75)
     text_draw.text(
-        (w // 8, h // 2.3),
+        (w // 12, h // 2.4),
         watermark_text,
-        fill=(110, 110, 110, 130),
+        fill=(29, 82, 216, 75),
         font=font,
     )
 
