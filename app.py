@@ -105,77 +105,79 @@ st.markdown(
 def process_report_page(page):
     rect = page.rect
 
-    # --- STEP 1: PRECISELY MASK PATIENT DETAILS ---
+    # --- STEP 1: CLEANLY MASK PATIENT DETAILS AREA ---
     page.draw_rect(
-        fitz.Rect(18, 105, rect.width - 18, 185), color=(1, 1, 1), fill=(1, 1, 1)
-    )
-    # Mask top right QR code area
-    page.draw_rect(
-        fitz.Rect(rect.width - 95, 75, rect.width - 15, 175),
-        color=(1, 1, 1),
-        fill=(1, 1, 1),
+        fitz.Rect(18, 70, rect.width - 18, 175), color=(1, 1, 1), fill=(1, 1, 1)
     )
 
-    # --- STEP 2: PRECISELY MASK DOCTOR SIGNATURES (Leaving names & footers visible) ---
+    # --- STEP 2: CLEANLY MASK DOCTOR SIGNATURES (Keeping names & footers intact) ---
     page.draw_rect(
-        fitz.Rect(25, rect.height - 215, 235, rect.height - 160),
+        fitz.Rect(20, rect.height - 215, 230, rect.height - 165),
         color=(1, 1, 1),
         fill=(1, 1, 1),
     )
     page.draw_rect(
         fitz.Rect(
-            rect.width - 250, rect.height - 215, rect.width - 20, rect.height - 160
+            rect.width - 240, rect.height - 215, rect.width - 20, rect.height - 165
         ),
         color=(1, 1, 1),
         fill=(1, 1, 1),
     )
 
-    # --- STEP 3: INSERT CLEAN DUMMY PLACEHOLDER TEXT ---
+    # --- STEP 3: INSERT EXACT DUMMY PATIENT METADATA ---
+    # Left Column Fields
     page.insert_text(
-        fitz.Point(22, 120),
-        "Patient Name : DUMMY PATIENT",
+        fitz.Point(22, 85),
+        "Patient Name : Mr. DUMMY PATIENT",
         fontsize=9.5,
         color=(0, 0, 0),
     )
     page.insert_text(
-        fitz.Point(22, 137),
-        "Age/Sex           : 30 Year(s) / General",
+        fitz.Point(22, 102),
+        "Age/Sex           : 30 Year(s) / Male",
         fontsize=9.5,
         color=(0, 0, 0),
     )
     page.insert_text(
-        fitz.Point(22, 154), "Ref.Doctor      : XXX", fontsize=9.5, color=(0, 0, 0)
+        fitz.Point(22, 119), "Ref.Doctor      : XXX", fontsize=9.5, color=(0, 0, 0)
     )
     page.insert_text(
-        fitz.Point(22, 171),
+        fitz.Point(22, 136),
         "Ref.Customer   : XXX",
         fontsize=9.5,
         color=(0, 0, 0),
     )
-
     page.insert_text(
-        fitz.Point(340, 120), "SID/PID    : XXX", fontsize=9.5, color=(0, 0, 0)
-    )
-    page.insert_text(
-        fitz.Point(340, 137),
-        "Collected  : 2026-10-21 10:00:00",
-        fontsize=9.5,
-        color=(0, 0, 0),
-    )
-    page.insert_text(
-        fitz.Point(340, 154),
-        "Registered : 2026-10-21 11:00:00",
-        fontsize=9.5,
-        color=(0, 0, 0),
-    )
-    page.insert_text(
-        fitz.Point(340, 171),
-        "Reported   : 2026-10-21 12:00:00",
-        fontsize=9.5,
-        color=(0, 0, 0),
+        fitz.Point(22, 153), "TPL Code         : XXX", fontsize=9.5, color=(0, 0, 0)
     )
 
-    # --- STEP 4: RENDER TO HIGH-RES IMAGE & ADD SKY BLUE WATERMAP (SIZE 72) ---
+    # Right Column Fields
+    page.insert_text(
+        fitz.Point(340, 85), "Sample Type : Serum", fontsize=9.5, color=(0, 0, 0)
+    )
+    page.insert_text(
+        fitz.Point(340, 102), "SID/PID        : XXX", fontsize=9.5, color=(0, 0, 0)
+    )
+    page.insert_text(
+        fitz.Point(340, 119),
+        "Collected on : 2026-10-21 10:00:00",
+        fontsize=9.5,
+        color=(0, 0, 0),
+    )
+    page.insert_text(
+        fitz.Point(340, 136),
+        "Registered on : 2026-10-21 11:00:00",
+        fontsize=9.5,
+        color=(0, 0, 0),
+    )
+    page.insert_text(
+        fitz.Point(340, 153),
+        "Reported on   : 2026-10-21 12:00:00",
+        fontsize=9.5,
+        color=(0, 0, 0),
+    )
+
+    # --- STEP 4: RENDER TO HIGH-RES IMAGE & ADD SIZE 72 SKY BLUE WATERMARK ---
     pix = page.get_pixmap(dpi=250)
     img = Image.open(io.BytesIO(pix.tobytes("png"))).convert("RGBA")
     w, h = img.size
@@ -189,11 +191,11 @@ def process_report_page(page):
     except IOError:
         font = ImageFont.load_default()
 
-    # Sky Blue color with professional transparency (R=29, G=82, B=216, Alpha=75)
+    # Sky Blue color with professional transparency (R=29, G=82, B=216, Alpha=80)
     text_draw.text(
-        (w // 12, h // 2.4),
+        (w // 14, h // 2.3),
         watermark_text,
-        fill=(29, 82, 216, 75),
+        fill=(29, 82, 216, 80),
         font=font,
     )
 
