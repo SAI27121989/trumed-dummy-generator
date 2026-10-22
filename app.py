@@ -121,7 +121,7 @@ def apply_dummy_watermark(page):
         fontname="hebo",
         color=(0.11, 0.32, 0.84),  # TruMed Blue
         morph=morph,
-        fill_opacity=0.25,  # Set to 25% opacity for clear readability
+        fill_opacity=0.25,  # 25% Opacity for clear readability of underlying text
     )
 
 
@@ -228,6 +228,7 @@ if uploaded_files:
                     current_page += 1
                     progress_bar.progress(current_page / total_pages_count)
 
+            # Save optimized output into memory with garbage collection
             output_bytes = io.BytesIO()
             combined_pdf.save(output_bytes, garbage=4, deflate=True)
             combined_pdf.close()
