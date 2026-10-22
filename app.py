@@ -106,7 +106,7 @@ st.markdown(
 # 2. ROBUST REDACTION & WATERMARK ENGINE
 # ==========================================
 def apply_dummy_watermark(page):
-    """Applies centered 35-degree angled watermark 'TruMed's DUMMY REPORT'."""
+    """Applies centered 35-degree angled watermark 'TruMed's DUMMY REPORT' at 25% opacity."""
     rect = page.rect
     watermark_text = "TruMed's DUMMY REPORT"
     center_point = fitz.Point(rect.width * 0.5, rect.height * 0.5)
@@ -119,15 +119,14 @@ def apply_dummy_watermark(page):
         watermark_text,
         fontsize=fontsize,
         fontname="hebo",
-        color=(0.11, 0.32, 0.84),
+        color=(0.11, 0.32, 0.84),  # TruMed Blue
         morph=morph,
-        fill_opacity=0.15,
+        fill_opacity=0.25,  # Set to 25% opacity for clear readability
     )
 
 
 def process_report_page(page):
     """Safely collects redactions, applies them in batch, inserts text, and watermarks."""
-    # List of metadata mappings to replace: (Keyword, New Value, Is Bold)
     replacements = [
         ("Patient Name", ": Mr DUMMY", True),
         ("Ref.Doctor", ": XXX", False),
@@ -201,34 +200,52 @@ if uploaded_files:
     )
 
     if st.button("🚀 Process & Generate Dummy PDF"):
-        with st.spinner(
-            "Updating metadata, generating watermarks, and clearing signatures..."
-        ):
-            combined_pdf = fitz.open()
-            total_pages = 0
+        progress_bar = st.progress(0)
+        status_text = st.empty()
 
+        try:
+            combined_pdf = fitz.open()
+            total_pages_count = sum(
+                len(fitz.open(stream=f.read(), filetype="pdf"))
+                for f in uploaded_files
+            )
+            for f in uploaded_files:
+                f.seek(0)
+
+            current_page = 0
             for uploaded_file in uploaded_files:
                 doc = fitz.open(stream=uploaded_file.read(), filetype="pdf")
 
                 for page_num in range(len(doc)):
+                    status_text.text(
+                        f"Processing page {current_page + 1} of {total_pages_count}..."
+                    )
                     page = doc[page_num]
                     process_report_page(page)
                     combined_pdf.insert_pdf(
                         doc, from_page=page_num, to_page=page_num
                     )
-                    total_pages += 1
+                    current_page += 1
+                    progress_bar.progress(current_page / total_pages_count)
 
             output_bytes = io.BytesIO()
-            combined_pdf.save(output_bytes)
+            combined_pdf.save(output_bytes, garbage=4, deflate=True)
             combined_pdf.close()
 
+            st.session_state["output_pdf"] = output_bytes.getvalue()
+            status_text.empty()
+            progress_bar.empty()
             st.success(
-                f"✅ Done! Successfully processed all **{total_pages} page(s)**."
+                f"✅ Done! Successfully processed all **{total_pages_count} page(s)**."
             )
 
-            st.download_button(
-                label="📥 Download Processed Dummy Report PDF",
-                data=output_bytes.getvalue(),
-                file_name="TruMed_Dummy_Report_Final.pdf",
-                mime="application/pdf",
-            )
+        except Exception as e:
+            st.error(f"An error occurred during processing: {str(e)}")
+
+    if "output_pdf" in st.session_state:
+        st.download_button(
+            label="📥 Download Processed Dummy Report PDF",
+            data=st.session_state["output_pdf"],
+            file_name="TruMed_Dummy_Report_Final.pdf",
+            mime="application/pdf",
+        )
