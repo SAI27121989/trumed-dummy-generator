@@ -126,22 +126,22 @@ def apply_dummy_watermark(page):
 
 
 def process_report_page(page):
-    """Safely collects precise redactions, applies them in batch, inserts text, and watermarks."""
+    """Safely collects precise bounded redactions, applies them in batch, inserts text, and watermarks."""
     replacements = [
-        ("Patient Name", ": Mr DUMMY", True),
-        ("Ref.Doctor", ": XXX", False),
-        ("Ref.Customer", ": XXX", False),
-        ("TPL Code", ": XXX", False),
-        ("SID/PID", ": XXX", False),
+        ("Patient Name", ": Mr DUMMY", True, 130),
+        ("Ref.Doctor", ": XXX", False, 130),
+        ("Ref.Customer", ": XXX", False, 130),
+        ("TPL Code", ": XXX", False, 130),
+        ("SID/PID", ": XXX", False, 130),
     ]
 
-    # 1. Add precise, narrow redaction annotations for metadata fields so they don't overlap neighboring columns
-    for keyword, _, _ in replacements:
+    # 1. Add strict bounded redaction annotations for metadata fields
+    for keyword, _, _, max_width in replacements:
         matches = page.search_for(keyword)
         if matches:
             r = matches[0]
-            # Reduced width to 100 pixels to protect neighboring columns like Sample Type and timestamps
-            val_box = fitz.Rect(r.x1 + 2, r.y0 - 2, r.x1 + 100, r.y1 + 2)
+            # Restrict redaction strictly to the value's column space without touching neighboring text
+            val_box = fitz.Rect(r.x1 + 2, r.y0 - 2, r.x1 + max_width, r.y1 + 2)
             page.add_redact_annot(val_box, fill=(1, 1, 1))
 
     # 2. Add redaction for top QR code block ("scan to download")
@@ -166,7 +166,7 @@ def process_report_page(page):
     page.apply_redactions()
 
     # 5. Insert replacement text cleanly after redaction layer is committed
-    for keyword, new_text, is_bold in replacements:
+    for keyword, new_text, is_bold, _ in replacements:
         matches = page.search_for(keyword)
         if matches:
             r = matches[0]
