@@ -126,23 +126,14 @@ def apply_dummy_watermark(page):
 
 
 def process_report_page(page):
-    """Safely collects precise bounded redactions, applies them in batch, inserts text, and watermarks."""
-    replacements = [
-        ("Patient Name", ": Mr DUMMY", True, 130),
-        ("Ref.Doctor", ": XXX", False, 130),
-        ("Ref.Customer", ": XXX", False, 130),
-        ("TPL Code", ": XXX", False, 130),
-        ("SID/PID", ": XXX", False, 130),
-    ]
+    """Cleans the patient details header block using a precise coordinate zone, then stamps dummy info."""
 
-    # 1. Add strict bounded redaction annotations for metadata fields
-    for keyword, _, _, max_width in replacements:
-        matches = page.search_for(keyword)
-        if matches:
-            r = matches[0]
-            # Restrict redaction strictly to the value's column space without touching neighboring text
-            val_box = fitz.Rect(r.x1 + 2, r.y0 - 2, r.x1 + max_width, r.y1 + 2)
-            page.add_redact_annot(val_box, fill=(1, 1, 1))
+    # 1. Define a clean bounding box over the patient details header area (coordinates tailored for standard lab report layouts)
+    # This completely wipes out any messy overlapping text, trailing timestamps, or real patient metadata safely.
+    header_box = fitz.Rect(
+        35, 95, 575, 185
+    )  # Left, Top, Right, Bottom boundaries
+    page.add_redact_annot(header_box, fill=(1, 1, 1))
 
     # 2. Add redaction for top QR code block ("scan to download")
     top_qr = page.search_for("scan to download")
@@ -165,19 +156,42 @@ def process_report_page(page):
     # 4. Apply all collected redactions simultaneously
     page.apply_redactions()
 
-    # 5. Insert replacement text cleanly after redaction layer is committed
-    for keyword, new_text, is_bold, _ in replacements:
-        matches = page.search_for(keyword)
-        if matches:
-            r = matches[0]
-            font_name = "Helvetica-Bold" if is_bold else "Helvetica"
-            page.insert_text(
-                fitz.Point(r.x1 + 4, r.y1 - 1),
-                new_text,
-                fontsize=9,
-                fontname=font_name,
-                color=(0, 0, 0),
-            )
+    # 5. Insert clean, perfectly aligned dummy header text into the cleared zone
+    page.insert_text(
+        fitz.Point(40, 112),
+        "Patient Name : Mr DUMMY",
+        fontsize=9,
+        fontname="Helvetica-Bold",
+        color=(0, 0, 0),
+    )
+    page.insert_text(
+        fitz.Point(40, 127),
+        "Ref.Doctor   : XXX",
+        fontsize=9,
+        fontname="Helvetica",
+        color=(0, 0, 0),
+    )
+    page.insert_text(
+        fitz.Point(40, 142),
+        "Ref.Customer : XXX",
+        fontsize=9,
+        fontname="Helvetica",
+        color=(0, 0, 0),
+    )
+    page.insert_text(
+        fitz.Point(40, 157),
+        "TPL Code     : XXX",
+        fontsize=9,
+        fontname="Helvetica",
+        color=(0, 0, 0),
+    )
+    page.insert_text(
+        fitz.Point(320, 112),
+        "SID/PID      : XXX",
+        fontsize=9,
+        fontname="Helvetica",
+        color=(0, 0, 0),
+    )
 
     # 6. Apply Watermark
     apply_dummy_watermark(page)
