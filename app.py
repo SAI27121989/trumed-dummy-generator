@@ -106,7 +106,7 @@ st.markdown(
 # 2. ROBUST REDACTION & WATERMARK ENGINE
 # ==========================================
 def apply_dummy_watermark(page):
-    """Applies centered 35-degree angled watermark 'TruMed's DUMMY REPORT' at 25% opacity."""
+    """Applies centered 35-degree angled watermark 'TruMed's DUMMY REPORT' at 25% opacity using standard built-in font."""
     rect = page.rect
     watermark_text = "TruMed's DUMMY REPORT"
     center_point = fitz.Point(rect.width * 0.5, rect.height * 0.5)
@@ -118,10 +118,10 @@ def apply_dummy_watermark(page):
         center_point,
         watermark_text,
         fontsize=fontsize,
-        fontname="hebo",
+        fontname="Helvetica-Bold",  # Fixed standard built-in font name
         color=(0.11, 0.32, 0.84),  # TruMed Blue
         morph=morph,
-        fill_opacity=0.25,  # 25% Opacity for clear readability of underlying text
+        fill_opacity=0.25,  # 25% Opacity
     )
 
 
@@ -169,7 +169,7 @@ def process_report_page(page):
         matches = page.search_for(keyword)
         if matches:
             r = matches[0]
-            font_name = "helv-bold" if is_bold else "helv"
+            font_name = "Helvetica-Bold" if is_bold else "Helvetica"
             page.insert_text(
                 fitz.Point(r.x1 + 4, r.y1 - 1),
                 new_text,
@@ -228,7 +228,6 @@ if uploaded_files:
                     current_page += 1
                     progress_bar.progress(current_page / total_pages_count)
 
-            # Save optimized output into memory with garbage collection
             output_bytes = io.BytesIO()
             combined_pdf.save(output_bytes, garbage=4, deflate=True)
             combined_pdf.close()
