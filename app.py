@@ -106,7 +106,7 @@ st.markdown(
 # 2. ROBUST REDACTION & WATERMARK ENGINE
 # ==========================================
 def apply_dummy_watermark(page):
-    """Applies centered 35-degree angled watermark 'TruMed's DUMMY REPORT' at 25% opacity using standard built-in font."""
+    """Applies centered 35-degree angled watermark 'TruMed's DUMMY REPORT' at 25% opacity."""
     rect = page.rect
     watermark_text = "TruMed's DUMMY REPORT"
     center_point = fitz.Point(rect.width * 0.5, rect.height * 0.5)
@@ -118,7 +118,7 @@ def apply_dummy_watermark(page):
         center_point,
         watermark_text,
         fontsize=fontsize,
-        fontname="Helvetica-Bold",  # Fixed standard built-in font name
+        fontname="Helvetica-Bold",
         color=(0.11, 0.32, 0.84),  # TruMed Blue
         morph=morph,
         fill_opacity=0.25,  # 25% Opacity
@@ -126,7 +126,7 @@ def apply_dummy_watermark(page):
 
 
 def process_report_page(page):
-    """Safely collects redactions, applies them in batch, inserts text, and watermarks."""
+    """Safely collects precise redactions, applies them in batch, inserts text, and watermarks."""
     replacements = [
         ("Patient Name", ": Mr DUMMY", True),
         ("Ref.Doctor", ": XXX", False),
@@ -135,12 +135,13 @@ def process_report_page(page):
         ("SID/PID", ": XXX", False),
     ]
 
-    # 1. Add redaction annotations for metadata fields
+    # 1. Add precise, narrow redaction annotations for metadata fields so they don't overlap neighboring columns
     for keyword, _, _ in replacements:
         matches = page.search_for(keyword)
         if matches:
             r = matches[0]
-            val_box = fitz.Rect(r.x1 + 2, r.y0 - 2, r.x1 + 220, r.y1 + 2)
+            # Reduced width to 100 pixels to protect neighboring columns like Sample Type and timestamps
+            val_box = fitz.Rect(r.x1 + 2, r.y0 - 2, r.x1 + 100, r.y1 + 2)
             page.add_redact_annot(val_box, fill=(1, 1, 1))
 
     # 2. Add redaction for top QR code block ("scan to download")
