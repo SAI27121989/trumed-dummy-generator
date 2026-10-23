@@ -8,7 +8,7 @@ import streamlit as st
 # 1. STREAMLIT PAGE CONFIGURATION & UI
 # ==========================================
 st.set_page_config(
-    page_title="TruMed Path Labs - Clean Dummy Generator",
+    page_title="TruMed Path Labs - Final Dummy Generator",
     page_icon="🧪",
     layout="wide",
 )
@@ -88,7 +88,7 @@ st.markdown(
             {logo_html}
             <div>
                 <h1 class="banner-title">TruMed Path Labs India Pvt Ltd.</h1>
-                <div class="banner-subtitle">Clean Dummy Report Generator</div>
+                <div class="banner-subtitle">Final Dummy Report Generator</div>
                 <div class="banner-contact">📞 Helpline: +91 703636 63689</div>
                 <div class="banner-address">📍 Central Lab, Plot No. 32, Umakanth Arcade, Vasavi Nagar Colony, Karkhana, Secunderabad, Telangana - 500015</div>
             </div>
@@ -103,7 +103,7 @@ st.markdown(
 
 
 # ==========================================
-# 2. CLEAN SLATE REDACTION & WATERMARK ENGINE
+# 2. DEPARTMENT-SAFE REDACTION ENGINE
 # ==========================================
 def apply_margin_watermark(page):
     """Applies a clean, non-intrusive watermark banner in the top margin at 25% opacity."""
@@ -122,26 +122,20 @@ def apply_margin_watermark(page):
 
 
 def process_report_page(page):
-    """Wipes the messy metadata area cleanly and prints structured dummy details."""
+    """Surgically wipes only the patient info section while keeping department names and test tables safe."""
     
-    # 1. Dynamically find where the test table starts ("TEST DESCRIPTION")
-    table_matches = page.search_for("TEST DESCRIPTION")
-    header_bottom = 175
-    if table_matches:
-        header_bottom = table_matches[0].y0 - 2
-
-    # 2. Clean slate wipe of the entire metadata block zone between header and test table
-    metadata_box = fitz.Rect(35, 95, 575, header_bottom)
+    # Define a fixed, safe height for patient metadata block so it never touches department titles
+    metadata_box = fitz.Rect(35, 95, 575, 145)
     page.add_redact_annot(metadata_box, fill=(1, 1, 1))
 
-    # 3. Redact top QR code block if present
+    # Redact top QR code block if present
     top_qr = page.search_for("scan to download")
     if top_qr:
         for qr_r in top_qr:
             qr_box = fitz.Rect(qr_r.x0 - 10, qr_r.y0 - 50, qr_r.x1 + 10, qr_r.y1 + 10)
             page.add_redact_annot(qr_box, fill=(1, 1, 1))
 
-    # 4. Redact doctor signatures and designations at the bottom
+    # Redact doctor signatures and designations at the bottom
     for sign_keyword in ["PATHOLOGIST", "BIOCHEMIST", "MD", "DNB", "CONSULTANT"]:
         sign_matches = page.search_for(sign_keyword)
         for sign_rect in sign_matches:
@@ -156,15 +150,13 @@ def process_report_page(page):
     # Commit all redactions
     page.apply_redactions()
 
-    # 5. Stamp clean, perfectly aligned professional dummy metadata
-    page.insert_text(fitz.Point(40, 112), "Patient Name : Mr DUMMY", fontsize=9, fontname="Helvetica-Bold", color=(0, 0, 0))
-    page.insert_text(fitz.Point(40, 127), "Ref.Doctor   : XXX", fontsize=9, fontname="Helvetica", color=(0, 0, 0))
-    page.insert_text(fitz.Point(40, 142), "Ref.Customer : XXX", fontsize=9, fontname="Helvetica", color=(0, 0, 0))
-    page.insert_text(fitz.Point(40, 157), "TPL Code     : XXX", fontsize=9, fontname="Helvetica", color=(0, 0, 0))
-    page.insert_text(fitz.Point(320, 112), "SID/PID      : XXX", fontsize=9, fontname="Helvetica", color=(0, 0, 0))
-    page.insert_text(fitz.Point(320, 127), "Sample Type  : Serum", fontsize=9, fontname="Helvetica", color=(0, 0, 0))
+    # Stamp clean, perfectly aligned professional dummy metadata in the safe zone
+    page.insert_text(fitz.Point(40, 110), "Patient Name : Mr DUMMY", fontsize=9, fontname="Helvetica-Bold", color=(0, 0, 0))
+    page.insert_text(fitz.Point(40, 125), "Ref.Doctor   : XXX", fontsize=9, fontname="Helvetica", color=(0, 0, 0))
+    page.insert_text(fitz.Point(320, 110), "SID/PID      : XXX", fontsize=9, fontname="Helvetica", color=(0, 0, 0))
+    page.insert_text(fitz.Point(320, 125), "Sample Type  : Serum", fontsize=9, fontname="Helvetica", color=(0, 0, 0))
 
-    # 6. Apply Margin Watermark Banner
+    # Apply Margin Watermark Banner
     apply_margin_watermark(page)
 
 
@@ -172,7 +164,7 @@ def process_report_page(page):
 # 3. STREAMLIT FILE PROCESSING DASHBOARD
 # ==========================================
 st.subheader("📁 Upload Lab Reports")
-st.write("Upload original lab reports to generate clean, standardized dummy PDFs.")
+st.write("Upload original lab reports to generate clean dummy PDFs with department names preserved.")
 
 uploaded_files = st.file_uploader(
     "Drag and drop PDF files here", type=["pdf"], accept_multiple_files=True
@@ -215,15 +207,15 @@ if uploaded_files:
             st.session_state["output_pdf"] = output_bytes.getvalue()
             status_text.empty()
             progress_bar.empty()
-            st.success(f"✅ Success! Processed all **{total_pages_count} page(s)** cleanly.")
+            st.success(f"✅ Success! Processed all **{total_pages_count} page(s)** safely.")
 
         except Exception as e:
             st.error(f"An error occurred during processing: {str(e)}")
 
     if "output_pdf" in st.session_state:
         st.download_button(
-            label="📥 Download Clean Dummy Report PDF",
+            label="📥 Download Final Dummy Report PDF",
             data=st.session_state["output_pdf"],
-            file_name="TruMed_Clean_Dummy_Report.pdf",
+            file_name="TruMed_Final_Dummy_Report.pdf",
             mime="application/pdf",
         )
