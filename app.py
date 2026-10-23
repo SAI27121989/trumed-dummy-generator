@@ -1,7 +1,6 @@
 import base64
 import io
 import os
-import re
 import fitz  # PyMuPDF
 import streamlit as st
 
@@ -104,7 +103,7 @@ st.markdown(
 
 
 # ==========================================
-# 2. AI SMART SCRUBBING & WATERMARK ENGINE
+# 2. POLISHED SCRUBBING & WATERMARK ENGINE
 # ==========================================
 def apply_margin_watermark(page):
     """Applies a clean, non-intrusive watermark banner in the top margin at 25% opacity."""
@@ -122,11 +121,9 @@ def apply_margin_watermark(page):
     )
 
 
-def ai_smart_process_page(page):
-    """Uses AI heuristic patterns and surgical word-level scanning to detect and mask PII dynamically."""
-    
-    # Target entities to scrub using AI pattern matching
-    target_labels = [
+def process_report_page(page):
+    """Surgically redacts sensitive value boxes and cleans signatures/QR codes."""
+    replacements = [
         ("Patient Name", ": Mr DUMMY", True, 120),
         ("Ref.Doctor", ": XXX", False, 100),
         ("Ref.Customer", ": XXX", False, 100),
@@ -134,23 +131,22 @@ def ai_smart_process_page(page):
         ("SID/PID", ": XXX", False, 100),
     ]
 
-    # 1. AI-powered intelligent coordinate detection & surgical micro-redaction
-    for keyword, _, _, max_width in target_labels:
+    # 1. Precise micro-redactions on metadata values only
+    for keyword, _, _, max_width in replacements:
         matches = page.search_for(keyword)
         if matches:
             for r in matches:
-                # Dynamically calculate bounding box for the value block following the detected entity label
                 val_box = fitz.Rect(r.x1 + 2, r.y0 - 2, r.x1 + max_width, r.y1 + 2)
                 page.add_redact_annot(val_box, fill=(1, 1, 1))
 
-    # 2. AI structural detection for QR codes ("scan to download")
+    # 2. Redact top QR code block ("scan to download")
     top_qr = page.search_for("scan to download")
     if top_qr:
         for qr_r in top_qr:
             qr_box = fitz.Rect(qr_r.x0 - 10, qr_r.y0 - 50, qr_r.x1 + 10, qr_r.y1 + 10)
             page.add_redact_annot(qr_box, fill=(1, 1, 1))
 
-    # 3. AI structural detection for medical signatures & credentials (Pathologist/Biochemist)
+    # 3. Redact doctor signatures and designations
     for sign_keyword in ["PATHOLOGIST", "BIOCHEMIST", "MD", "DNB"]:
         sign_matches = page.search_for(sign_keyword)
         for sign_rect in sign_matches:
@@ -162,11 +158,11 @@ def ai_smart_process_page(page):
             )
             page.add_redact_annot(sig_box, fill=(1, 1, 1))
 
-    # 4. Commit all AI-detected redactions simultaneously
+    # 4. Commit all redactions
     page.apply_redactions()
 
-    # 5. Insert clean dummy replacement text into the AI-cleared slots
-    for keyword, new_text, is_bold, _ in target_labels:
+    # 5. Insert clean replacement text precisely into the cleared slots
+    for keyword, new_text, is_bold, _ in replacements:
         matches = page.search_for(keyword)
         if matches:
             r = matches[0]
@@ -188,7 +184,7 @@ def ai_smart_process_page(page):
 # ==========================================
 st.subheader("📁 Upload Lab Reports")
 st.write(
-    "Upload original lab reports to let the AI engine dynamically detect PII, apply surgical redactions, and stamp clean margin watermarks."
+    "Upload original lab reports to generate standardized dummy PDFs with pristine headers and margin watermarks."
 )
 
 uploaded_files = st.file_uploader(
@@ -197,10 +193,10 @@ uploaded_files = st.file_uploader(
 
 if uploaded_files:
     st.info(
-        f"📋 **{len(uploaded_files)} file(s)** uploaded and ready for AI processing."
+        f"📋 **{len(uploaded_files)} file(s)** uploaded and ready for processing."
     )
 
-    if st.button("🤖 Run AI Process & Generate Dummy PDF"):
+    if st.button("🚀 Process & Generate Dummy PDF"):
         progress_bar = st.progress(0)
         status_text = st.empty()
 
@@ -219,10 +215,10 @@ if uploaded_files:
 
                 for page_num in range(len(doc)):
                     status_text.text(
-                        f"AI processing page {current_page + 1} of {total_pages_count}..."
+                        f"Processing page {current_page + 1} of {total_pages_count}..."
                     )
                     page = doc[page_num]
-                    ai_smart_process_page(page)
+                    process_report_page(page)
                     combined_pdf.insert_pdf(
                         doc, from_page=page_num, to_page=page_num
                     )
@@ -237,16 +233,16 @@ if uploaded_files:
             status_text.empty()
             progress_bar.empty()
             st.success(
-                f"✅ AI Processing Complete! Successfully scrubbed all **{total_pages_count} page(s)**."
+                f"✅ Done! Successfully processed all **{total_pages_count} page(s)**."
             )
 
         except Exception as e:
-            st.error(f"An error occurred during AI processing: {str(e)}")
+            st.error(f"An error occurred during processing: {str(e)}")
 
     if "output_pdf" in st.session_state:
         st.download_button(
-            label="📥 Download AI-Processed Dummy Report PDF",
+            label="📥 Download Processed Dummy Report PDF",
             data=st.session_state["output_pdf"],
-            file_name="TruMed_AI_Dummy_Report_Final.pdf",
+            file_name="TruMed_Dummy_Report_Final.pdf",
             mime="application/pdf",
         )
