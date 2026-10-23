@@ -8,7 +8,7 @@ import streamlit as st
 # 1. STREAMLIT PAGE CONFIGURATION & UI
 # ==========================================
 st.set_page_config(
-    page_title="TruMed Path Labs - Dynamic AI Dummy Generator",
+    page_title="TruMed Path Labs - Precision Dummy Generator",
     page_icon="🧪",
     layout="wide",
 )
@@ -88,7 +88,7 @@ st.markdown(
             {logo_html}
             <div>
                 <h1 class="banner-title">TruMed Path Labs India Pvt Ltd.</h1>
-                <div class="banner-subtitle">Dynamic AI-Powered Dummy Report Generator</div>
+                <div class="banner-subtitle">Precision Dummy Report Generator</div>
                 <div class="banner-contact">📞 Helpline: +91 703636 63689</div>
                 <div class="banner-address">📍 Central Lab, Plot No. 32, Umakanth Arcade, Vasavi Nagar Colony, Karkhana, Secunderabad, Telangana - 500015</div>
             </div>
@@ -103,7 +103,7 @@ st.markdown(
 
 
 # ==========================================
-# 2. DYNAMIC ANCHOR ENGINE & WATERMARK
+# 2. PRECISION SURGICAL VALUE REDACTION ENGINE
 # ==========================================
 def apply_margin_watermark(page):
     """Applies a clean, non-intrusive watermark banner in the top margin at 25% opacity."""
@@ -122,19 +122,34 @@ def apply_margin_watermark(page):
 
 
 def process_report_page(page):
-    """Dynamically calculates the header boundary based on page anchors and applies clean masking."""
+    """Targeted surgical redaction on PII values only, preserving native labels and layout."""
     
-    # 1. Dynamically locate where the test table starts ("TEST DESCRIPTION") to set the bottom boundary
-    table_matches = page.search_for("TEST DESCRIPTION")
-    header_bottom = 175  # Default fallback
-    if table_matches:
-        header_bottom = table_matches[0].y0 - 4
+    # Define targets: (Keyword Label, Dummy Replacement Text, Is Bold, Redaction Width)
+    targets = [
+        ("Patient Name", "Mr DUMMY", True, 130),
+        ("Ref.Doctor", "XXX", False, 120),
+        ("Ref.Customer", "XXX", False, 120),
+        ("TPL Code", "XXX", False, 100),
+        ("SID/PID", "XXX", False, 100),
+    ]
 
-    # 2. Define the dynamic header cleaning box using the discovered bottom boundary
-    header_clean_box = fitz.Rect(35, 95, 575, header_bottom)
-    page.add_redact_annot(header_clean_box, fill=(1, 1, 1))
+    # 1. Surgically redact ONLY the value space next to each label keyword
+    for keyword, _, _, max_width in targets:
+        matches = page.search_for(keyword)
+        if matches:
+            for r in matches:
+                # Target the exact region to the right of the label colon
+                val_box = fitz.Rect(r.x1 + 2, r.y0 - 2, r.x1 + max_width, r.y1 + 2)
+                page.add_redact_annot(val_box, fill=(1, 1, 1))
 
-    # 3. Detect and redact signatures/designations
+    # 2. Redact top QR code block ("scan to download")
+    top_qr = page.search_for("scan to download")
+    if top_qr:
+        for qr_r in top_qr:
+            qr_box = fitz.Rect(qr_r.x0 - 10, qr_r.y0 - 50, qr_r.x1 + 10, qr_r.y1 + 10)
+            page.add_redact_annot(qr_box, fill=(1, 1, 1))
+
+    # 3. Redact doctor signatures and designations at the bottom
     for sign_keyword in ["PATHOLOGIST", "BIOCHEMIST", "MD", "DNB", "CONSULTANT"]:
         sign_matches = page.search_for(sign_keyword)
         for sign_rect in sign_matches:
@@ -146,24 +161,24 @@ def process_report_page(page):
             )
             page.add_redact_annot(sig_box, fill=(1, 1, 1))
 
-    # 4. Detect and redact top QR code block
-    top_qr = page.search_for("scan to download")
-    if top_qr:
-        for qr_r in top_qr:
-            qr_box = fitz.Rect(qr_r.x0 - 10, qr_r.y0 - 50, qr_r.x1 + 10, qr_r.y1 + 10)
-            page.add_redact_annot(qr_box, fill=(1, 1, 1))
-
-    # 5. Commit all redactions
+    # 4. Commit all redactions
     page.apply_redactions()
 
-    # 6. Insert standardized dummy metadata cleanly into the header area
-    page.insert_text(fitz.Point(40, 112), "Patient Name : Mr DUMMY", fontsize=9, fontname="Helvetica-Bold", color=(0, 0, 0))
-    page.insert_text(fitz.Point(40, 127), "Ref.Doctor   : XXX", fontsize=9, fontname="Helvetica", color=(0, 0, 0))
-    page.insert_text(fitz.Point(40, 142), "Ref.Customer : XXX", fontsize=9, fontname="Helvetica", color=(0, 0, 0))
-    page.insert_text(fitz.Point(40, 157), "TPL Code     : XXX", fontsize=9, fontname="Helvetica", color=(0, 0, 0))
-    page.insert_text(fitz.Point(320, 112), "SID/PID      : XXX", fontsize=9, fontname="Helvetica", color=(0, 0, 0))
+    # 5. Insert clean dummy replacement text precisely into the cleared value slots
+    for keyword, new_text, is_bold, _ in targets:
+        matches = page.search_for(keyword)
+        if matches:
+            r = matches[0]
+            font_name = "Helvetica-Bold" if is_bold else "Helvetica"
+            page.insert_text(
+                fitz.Point(r.x1 + 4, r.y1 - 1),
+                new_text,
+                fontsize=9,
+                fontname=font_name,
+                color=(0, 0, 0),
+            )
 
-    # 7. Apply Margin Watermark Banner
+    # 6. Apply Margin Watermark Banner
     apply_margin_watermark(page)
 
 
@@ -172,7 +187,7 @@ def process_report_page(page):
 # ==========================================
 st.subheader("📁 Upload Lab Reports")
 st.write(
-    "Upload original lab reports to run the dynamic anchor engine and generate perfectly aligned dummy PDFs."
+    "Upload original lab reports to generate standardized dummy PDFs with native labels preserved and PII securely masked."
 )
 
 uploaded_files = st.file_uploader(
@@ -221,7 +236,7 @@ if uploaded_files:
             status_text.empty()
             progress_bar.empty()
             st.success(
-                f"✅ Success! Processed all **{total_pages_count} page(s)** with dynamic alignment."
+                f"✅ Success! Processed all **{total_pages_count} page(s)** with precision surgical redaction."
             )
 
         except Exception as e:
@@ -231,6 +246,6 @@ if uploaded_files:
         st.download_button(
             label="📥 Download Processed Dummy Report PDF",
             data=st.session_state["output_pdf"],
-            file_name="TruMed_Dynamic_Dummy_Report_Final.pdf",
+            file_name="TruMed_Precision_Dummy_Report.pdf",
             mime="application/pdf",
         )
