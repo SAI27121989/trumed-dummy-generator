@@ -103,7 +103,7 @@ st.markdown(
 
 
 # ==========================================
-# 2. SAFE & ROBUST REDACTION ENGINE
+# 2. XXXXX REDACTION & ERASURE ENGINE
 # ==========================================
 def apply_margin_watermark(page):
     """Applies a professional banner watermark in the top margin at 25% opacity."""
@@ -122,13 +122,20 @@ def apply_margin_watermark(page):
 
 
 def process_report_page(page):
-    """Surgically cleans patient metadata and signatures while keeping layout and department headers intact."""
+    """Erase/strike out sensitive fields and put XXXXX for Patient Name and SID/PID."""
     
-    # 1. Safe Metadata Box Wipe (Targets patient info area strictly without touching department titles below)
-    metadata_box = fitz.Rect(30, 92, 575, 140)
+    # 1. Wipe the entire patient info zone cleanly to remove doctors, dates, and extra metadata
+    metadata_box = fitz.Rect(30, 92, 575, 145)
     page.add_redact_annot(metadata_box, fill=(1, 1, 1))
 
-    # 2. Redact pathologist/doctor signatures at the bottom if present
+    # 2. Erase/strike out any stray sensitive labels appearing across pages
+    for stray_keyword in ["Ref.Doctor", "Ref.Customer", "Collected on", "Registered on", "Reported on"]:
+        stray_matches = page.search_for(stray_keyword)
+        for sm in stray_matches:
+            stray_box = fitz.Rect(sm.x0 - 2, sm.y0 - 2, sm.x1 + 180, sm.y1 + 2)
+            page.add_redact_annot(stray_box, fill=(1, 1, 1))
+
+    # 3. Redact pathologist/doctor signatures at the bottom
     for sign_keyword in ["PATHOLOGIST", "BIOCHEMIST", "MD", "DNB", "CONSULTANT"]:
         sign_matches = page.search_for(sign_keyword)
         for sign_rect in sign_matches:
@@ -140,16 +147,15 @@ def process_report_page(page):
             )
             page.add_redact_annot(sig_box, fill=(1, 1, 1))
 
-    # Commit redactions
+    # Commit redactions (erasing everything targeted)
     page.apply_redactions()
 
-    # 3. Stamp clean, uniform professional dummy metadata
-    page.insert_text(fitz.Point(35, 105), "Patient Name : Mr DUMMY", fontsize=9, fontname="Helvetica-Bold", color=(0, 0, 0))
-    page.insert_text(fitz.Point(35, 120), "Ref.Doctor   : XXX", fontsize=9, fontname="Helvetica", color=(0, 0, 0))
-    page.insert_text(fitz.Point(320, 105), "SID/PID      : XXX", fontsize=9, fontname="Helvetica", color=(0, 0, 0))
-    page.insert_text(fitz.Point(320, 120), "Sample Type  : Serum", fontsize=9, fontname="Helvetica", color=(0, 0, 0))
+    # 4. Stamp back ONLY Patient Name and SID/PID as XXXXX cleanly
+    page.insert_text(fitz.Point(35, 105), "Patient Name : XXXXX", fontsize=9, fontname="Helvetica-Bold", color=(0, 0, 0))
+    page.insert_text(fitz.Point(35, 120), "SID/PID      : XXXXX", fontsize=9, fontname="Helvetica-Bold", color=(0, 0, 0))
+    page.insert_text(fitz.Point(320, 105), "Sample Type  : Serum", fontsize=9, fontname="Helvetica", color=(0, 0, 0))
 
-    # 4. Apply Margin Watermark Banner
+    # 5. Apply Margin Watermark Banner
     apply_margin_watermark(page)
 
 
@@ -157,7 +163,7 @@ def process_report_page(page):
 # 3. STREAMLIT FILE PROCESSING DASHBOARD
 # ==========================================
 st.subheader("📁 Upload Lab Reports")
-st.write("Upload original lab reports to generate clean dummy PDFs instantly.")
+st.write("Upload original lab reports to generate clean dummy PDFs with XXXXX masking.")
 
 uploaded_files = st.file_uploader(
     "Drag and drop PDF files here", type=["pdf"], accept_multiple_files=True
@@ -173,7 +179,6 @@ if uploaded_files:
         try:
             combined_pdf = fitz.open()
             
-            # Calculate total pages across all files for accurate progress tracking
             doc_list = []
             total_pages_count = 0
             for uploaded_file in uploaded_files:
@@ -207,6 +212,6 @@ if uploaded_files:
         st.download_button(
             label="📥 Download Clean Dummy Report PDF",
             data=st.session_state["output_pdf"],
-            file_name="TruMed_Clean_Dummy_Report.pdf",
+            file_name="TruMed_XXXXX_Dummy_Report.pdf",
             mime="application/pdf",
         )
