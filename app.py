@@ -3,28 +3,15 @@ import io
 import os
 import fitz  # PyMuPDF
 import streamlit as st
-import openai  # Requires: pip install openai
 
 # ==========================================
-# 1. STREAMLIT CONFIG & API SETUP
+# 1. STREAMLIT PAGE CONFIGURATION & UI
 # ==========================================
 st.set_page_config(
-    page_title="TruMed Path Labs - Vision AI Dummy Generator",
-    page_icon="🤖",
+    page_title="TruMed Path Labs - Free Dummy Generator",
+    page_icon="🧪",
     layout="wide",
 )
-
-st.title("🧪 TruMed Path Labs - Vision AI Report Scrubber")
-st.write("Upload your lab reports to let AI visually inspect, redact PII, and apply professional branding.")
-
-# Secure API Key input in sidebar
-with st.sidebar:
-    st.header("🔑 AI Configuration")
-    api_key = st.text_input("Enter OpenAI API Key", type="password")
-    if api_key:
-        openai.api_key = api_key
-    st.markdown("---")
-    st.info("This tool renders pages as images and uses Vision AI to intelligently locate PII and signature blocks.")
 
 # Load logo safely if present
 logo_html = ""
@@ -37,9 +24,86 @@ if os.path.exists(logo_path):
         encoded_logo = base64.b64encode(image_file.read()).decode()
     logo_html = f'<img src="data:image/png;base64,{encoded_logo}" style="max-height: 85px; background: white; padding: 10px; border-radius: 12px; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">'
 
+st.markdown(
+    f"""
+    <style>
+    .trumed-banner {{
+        background: linear-gradient(135deg, #1D52D8 0%, #153EB1 100%);
+        color: white;
+        padding: 24px 30px;
+        border-radius: 12px;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 25px;
+        box-shadow: 0 6px 15px rgba(29, 82, 216, 0.25);
+    }}
+    .banner-left {{
+        display: flex;
+        align-items: center;
+        gap: 24px;
+    }}
+    .banner-title {{
+        font-size: 28px;
+        font-weight: 800;
+        margin: 0;
+        color: #FFFFFF;
+        letter-spacing: 0.5px;
+    }}
+    .banner-subtitle {{
+        font-size: 15px;
+        color: #E2E8F0;
+        margin: 4px 0 2px 0;
+        font-weight: 600;
+    }}
+    .banner-contact {{
+        font-size: 13px;
+        color: #93C5FD;
+        margin: 0;
+        font-weight: 600;
+    }}
+    .banner-address {{
+        font-size: 12px;
+        color: #CBD5E1;
+        margin: 3px 0 0 0;
+    }}
+    .nabl-pill {{
+        background: linear-gradient(135deg, #FFB800 0%, #FF9F00 100%);
+        color: #0F172A;
+        font-weight: 900;
+        padding: 12px 22px;
+        border-radius: 30px;
+        font-size: 13px;
+        letter-spacing: 0.8px;
+        box-shadow: 0 4px 12px rgba(255, 159, 0, 0.4);
+        white-space: nowrap;
+        display: flex;
+        align-items: center;
+        gap: 6px;
+    }}
+    </style>
+
+    <div class="trumed-banner">
+        <div class="banner-left">
+            {logo_html}
+            <div>
+                <h1 class="banner-title">TruMed Path Labs India Pvt Ltd.</h1>
+                <div class="banner-subtitle">Free Local Dummy Report Generator</div>
+                <div class="banner-contact">📞 Helpline: +91 703636 63689</div>
+                <div class="banner-address">📍 Central Lab, Plot No. 32, Umakanth Arcade, Vasavi Nagar Colony, Karkhana, Secunderabad, Telangana - 500015</div>
+            </div>
+        </div>
+        <div class="nabl-pill">
+            🏅 NABL ACCREDITED LAB
+        </div>
+    </div>
+""",
+    unsafe_allow_html=True,
+)
+
 
 # ==========================================
-# 2. VISION AI DETECTION & REDACTION ENGINE
+# 2. LOCAL SURGICAL REDACTION ENGINE
 # ==========================================
 def apply_margin_watermark(page):
     """Applies a clean, non-intrusive watermark banner in the top margin at 25% opacity."""
@@ -56,118 +120,122 @@ def apply_margin_watermark(page):
         fill_opacity=0.25,
     )
 
-def vision_ai_detect_and_redact(page, client):
-    """Sends page image to Vision AI to identify PII text fragments, then redacts them."""
+
+def process_report_page(page):
+    """Surgically redacts PII values using local layout coordinates and text matching."""
     
-    # Render PDF page to high-res PNG image bytes
-    pix = page.get_pixmap(dpi=150)
-    img_bytes = pix.tobytes("png")
-    base64_image = base64.b64encode(img_bytes).decode('utf-8')
+    # 1. Define specific header fields to mask & replace
+    targets = [
+        ("Patient Name", "Mr DUMMY", True, 130),
+        ("Ref.Doctor", "XXX", False, 120),
+        ("Ref.Customer", "XXX", False, 120),
+        ("TPL Code", "XXX", False, 100),
+        ("SID/PID", "XXX", False, 100),
+    ]
 
-    # Prompt the Vision AI to find exact sensitive text strings to redact
-    prompt = (
-        "Analyze this medical lab report image. Identify all Personally Identifiable Information (PII) "
-        "that needs redaction for client review demonstrations. Specifically look for:\n"
-        "1. Real patient names\n"
-        "2. Referring doctor names or customer names\n"
-        "3. TPL Codes, SID numbers, or PID numbers\n"
-        "4. Pathologist names or signatures at the bottom\n\n"
-        "Return ONLY the exact text strings found on the page that correspond to these sensitive values, "
-        "formatted as a Python list of strings (e.g., [\"Patient Name Value\", \"Doctor Name\", \"SID Number\"]). "
-        "Do not include labels like 'Patient Name:', only return the actual sensitive values."
-    )
-
-    try:
-        response = client.chat.completions.create(
-            model="gpt-4o",
-            messages=[
-                {
-                    "role": "user",
-                    "content": [
-                        {"type": "text", "text": prompt},
-                        {
-                            "type": "image_url",
-                            "image_url": {"url": f"data:image/png;base64,{base64_image}"}
-                        }
-                    ]
-                }
-            ],
-            max_tokens=300
-        )
-        
-        ai_content = response.choices[0].message.content
-        # Simple parser to extract list items from AI text output
-        import ast
-        # Clean up code blocks if model returned markdown
-        cleaned_text = ai_content.replace("```python", "").replace("```", "").strip()
-        sensitive_phrases = ast.literal_eval(cleaned_text)
-        
-        if isinstance(sensitive_phrases, list):
-            for phrase in sensitive_phrases:
-                matches = page.search_for(phrase)
-                for inst in matches:
-                    page.add_redact_annot(inst, fill=(1, 1, 1))
-            page.apply_redactions()
-
-    except Exception as e:
-        # Fallback keyword approach if Vision API fails or key is missing
-        st.warning(f"Vision AI call skipped/failed on page: {str(e)}. Using fallback safety scrubber.")
-        for keyword in ["Patient Name", "Ref.Doctor", "SID/PID"]:
-            matches = page.search_for(keyword)
-            for m in matches:
-                val_box = fitz.Rect(m.x1, m.y0 - 2, m.x1 + 120, m.y1 + 2)
+    for keyword, _, _, max_width in targets:
+        matches = page.search_for(keyword)
+        if matches:
+            for r in matches:
+                val_box = fitz.Rect(r.x1 + 2, r.y0 - 2, r.x1 + max_width, r.y1 + 2)
                 page.add_redact_annot(val_box, fill=(1, 1, 1))
-        page.apply_redactions()
 
-    # Apply Margin Watermark Banner
+    # 2. Redact top QR code block
+    top_qr = page.search_for("scan to download")
+    if top_qr:
+        for qr_r in top_qr:
+            qr_box = fitz.Rect(qr_r.x0 - 10, qr_r.y0 - 50, qr_r.x1 + 10, qr_r.y1 + 10)
+            page.add_redact_annot(qr_box, fill=(1, 1, 1))
+
+    # 3. Redact doctor signatures and designations at the bottom
+    for sign_keyword in ["PATHOLOGIST", "BIOCHEMIST", "MD", "DNB", "CONSULTANT"]:
+        sign_matches = page.search_for(sign_keyword)
+        for sign_rect in sign_matches:
+            sig_box = fitz.Rect(
+                sign_rect.x0 - 120,
+                sign_rect.y0 - 45,
+                sign_rect.x1 + 120,
+                sign_rect.y1 + 10,
+            )
+            page.add_redact_annot(sig_box, fill=(1, 1, 1))
+
+    # 4. Commit all redactions
+    page.apply_redactions()
+
+    # 5. Insert clean replacement text
+    for keyword, new_text, is_bold, _ in targets:
+        matches = page.search_for(keyword)
+        if matches:
+            r = matches[0]
+            font_name = "Helvetica-Bold" if is_bold else "Helvetica"
+            page.insert_text(
+                fitz.Point(r.x1 + 4, r.y1 - 1),
+                new_text,
+                fontsize=9,
+                fontname=font_name,
+                color=(0, 0, 0),
+            )
+
+    # 6. Apply Margin Watermark Banner
     apply_margin_watermark(page)
 
 
 # ==========================================
-# 3. STREAMLIT DASHBOARD EXECUTION
+# 3. STREAMLIT FILE PROCESSING DASHBOARD
 # ==========================================
-uploaded_files = st.file_uploader("Upload Lab Report PDFs", type=["pdf"], accept_multiple_files=True)
+st.subheader("📁 Upload Lab Reports")
+st.write("Upload original lab reports to generate standardized dummy PDFs locally and completely free.")
+
+uploaded_files = st.file_uploader(
+    "Drag and drop PDF files here", type=["pdf"], accept_multiple_files=True
+)
 
 if uploaded_files:
-    if not api_key:
-        st.error("⚠️ Please enter your OpenAI API key in the sidebar to enable Vision AI processing.")
-    elif st.button("🤖 Run Vision AI Processing"):
-        client = openai.OpenAI(api_key=api_key)
+    st.info(f"📋 **{len(uploaded_files)} file(s)** uploaded and ready for processing.")
+
+    if st.button("🚀 Process & Generate Dummy PDF"):
         progress_bar = st.progress(0)
         status_text = st.empty()
 
         try:
             combined_pdf = fitz.open()
-            total_pages = sum(len(fitz.open(stream=f.read(), filetype="pdf")) for f in uploaded_files)
-            for f in uploaded_files: f.seek(0)
+            total_pages_count = sum(
+                len(fitz.open(stream=f.read(), filetype="pdf"))
+                for f in uploaded_files
+            )
+            for f in uploaded_files:
+                f.seek(0)
 
             current_page = 0
             for uploaded_file in uploaded_files:
                 doc = fitz.open(stream=uploaded_file.read(), filetype="pdf")
+
                 for page_num in range(len(doc)):
-                    status_text.text(f"Vision AI inspecting page {current_page + 1} of {total_pages}...")
+                    status_text.text(f"Processing page {current_page + 1} of {total_pages_count}...")
                     page = doc[page_num]
-                    vision_ai_detect_and_redact(page, client)
-                    combined_pdf.insert_pdf(doc, from_page=page_num, to_page=page_num)
+                    process_report_page(page)
+                    combined_pdf.insert_pdf(
+                        doc, from_page=page_num, to_page=page_num
+                    )
                     current_page += 1
-                    progress_bar.progress(current_page / total_pages)
+                    progress_bar.progress(current_page / total_pages_count)
 
             output_bytes = io.BytesIO()
             combined_pdf.save(output_bytes, garbage=4, deflate=True)
             combined_pdf.close()
 
-            st.session_state["vision_output"] = output_bytes.getvalue()
+            st.session_state["output_pdf"] = output_bytes.getvalue()
             status_text.empty()
             progress_bar.empty()
-            st.success("✅ Vision AI Processing Complete!")
+            st.success(f"✅ Success! Processed all **{total_pages_count} page(s)** locally.")
 
         except Exception as e:
-            st.error(f"Processing error: {str(e)}")
+            st.error(f"An error occurred during processing: {str(e)}")
 
-    if "vision_output" in st.session_state:
+    if "output_pdf" in st.session_state:
         st.download_button(
-            label="📥 Download Vision-AI Scrubbed PDF",
-            data=st.session_state["vision_output"],
-            file_name="TruMed_VisionAI_Dummy_Report.pdf",
+            label="📥 Download Processed Dummy Report PDF",
+            data=st.session_state["output_pdf"],
+            file_name="TruMed_Free_Dummy_Report.pdf",
             mime="application/pdf",
         )
