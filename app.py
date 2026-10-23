@@ -8,7 +8,7 @@ import streamlit as st
 # 1. STREAMLIT PAGE CONFIGURATION & UI
 # ==========================================
 st.set_page_config(
-    page_title="TruMed Path Labs - Free Dummy Generator",
+    page_title="TruMed Path Labs - Clean Dummy Generator",
     page_icon="🧪",
     layout="wide",
 )
@@ -88,7 +88,7 @@ st.markdown(
             {logo_html}
             <div>
                 <h1 class="banner-title">TruMed Path Labs India Pvt Ltd.</h1>
-                <div class="banner-subtitle">Free Local Dummy Report Generator</div>
+                <div class="banner-subtitle">Clean Dummy Report Generator</div>
                 <div class="banner-contact">📞 Helpline: +91 703636 63689</div>
                 <div class="banner-address">📍 Central Lab, Plot No. 32, Umakanth Arcade, Vasavi Nagar Colony, Karkhana, Secunderabad, Telangana - 500015</div>
             </div>
@@ -103,7 +103,7 @@ st.markdown(
 
 
 # ==========================================
-# 2. LOCAL SURGICAL REDACTION ENGINE
+# 2. CLEAN SLATE REDACTION & WATERMARK ENGINE
 # ==========================================
 def apply_margin_watermark(page):
     """Applies a clean, non-intrusive watermark banner in the top margin at 25% opacity."""
@@ -122,32 +122,26 @@ def apply_margin_watermark(page):
 
 
 def process_report_page(page):
-    """Surgically redacts PII values using local layout coordinates and text matching."""
+    """Wipes the messy metadata area cleanly and prints structured dummy details."""
     
-    # 1. Define specific header fields to mask & replace
-    targets = [
-        ("Patient Name", "Mr DUMMY", True, 130),
-        ("Ref.Doctor", "XXX", False, 120),
-        ("Ref.Customer", "XXX", False, 120),
-        ("TPL Code", "XXX", False, 100),
-        ("SID/PID", "XXX", False, 100),
-    ]
+    # 1. Dynamically find where the test table starts ("TEST DESCRIPTION")
+    table_matches = page.search_for("TEST DESCRIPTION")
+    header_bottom = 175
+    if table_matches:
+        header_bottom = table_matches[0].y0 - 2
 
-    for keyword, _, _, max_width in targets:
-        matches = page.search_for(keyword)
-        if matches:
-            for r in matches:
-                val_box = fitz.Rect(r.x1 + 2, r.y0 - 2, r.x1 + max_width, r.y1 + 2)
-                page.add_redact_annot(val_box, fill=(1, 1, 1))
+    # 2. Clean slate wipe of the entire metadata block zone between header and test table
+    metadata_box = fitz.Rect(35, 95, 575, header_bottom)
+    page.add_redact_annot(metadata_box, fill=(1, 1, 1))
 
-    # 2. Redact top QR code block
+    # 3. Redact top QR code block if present
     top_qr = page.search_for("scan to download")
     if top_qr:
         for qr_r in top_qr:
             qr_box = fitz.Rect(qr_r.x0 - 10, qr_r.y0 - 50, qr_r.x1 + 10, qr_r.y1 + 10)
             page.add_redact_annot(qr_box, fill=(1, 1, 1))
 
-    # 3. Redact doctor signatures and designations at the bottom
+    # 4. Redact doctor signatures and designations at the bottom
     for sign_keyword in ["PATHOLOGIST", "BIOCHEMIST", "MD", "DNB", "CONSULTANT"]:
         sign_matches = page.search_for(sign_keyword)
         for sign_rect in sign_matches:
@@ -159,22 +153,16 @@ def process_report_page(page):
             )
             page.add_redact_annot(sig_box, fill=(1, 1, 1))
 
-    # 4. Commit all redactions
+    # Commit all redactions
     page.apply_redactions()
 
-    # 5. Insert clean replacement text
-    for keyword, new_text, is_bold, _ in targets:
-        matches = page.search_for(keyword)
-        if matches:
-            r = matches[0]
-            font_name = "Helvetica-Bold" if is_bold else "Helvetica"
-            page.insert_text(
-                fitz.Point(r.x1 + 4, r.y1 - 1),
-                new_text,
-                fontsize=9,
-                fontname=font_name,
-                color=(0, 0, 0),
-            )
+    # 5. Stamp clean, perfectly aligned professional dummy metadata
+    page.insert_text(fitz.Point(40, 112), "Patient Name : Mr DUMMY", fontsize=9, fontname="Helvetica-Bold", color=(0, 0, 0))
+    page.insert_text(fitz.Point(40, 127), "Ref.Doctor   : XXX", fontsize=9, fontname="Helvetica", color=(0, 0, 0))
+    page.insert_text(fitz.Point(40, 142), "Ref.Customer : XXX", fontsize=9, fontname="Helvetica", color=(0, 0, 0))
+    page.insert_text(fitz.Point(40, 157), "TPL Code     : XXX", fontsize=9, fontname="Helvetica", color=(0, 0, 0))
+    page.insert_text(fitz.Point(320, 112), "SID/PID      : XXX", fontsize=9, fontname="Helvetica", color=(0, 0, 0))
+    page.insert_text(fitz.Point(320, 127), "Sample Type  : Serum", fontsize=9, fontname="Helvetica", color=(0, 0, 0))
 
     # 6. Apply Margin Watermark Banner
     apply_margin_watermark(page)
@@ -184,7 +172,7 @@ def process_report_page(page):
 # 3. STREAMLIT FILE PROCESSING DASHBOARD
 # ==========================================
 st.subheader("📁 Upload Lab Reports")
-st.write("Upload original lab reports to generate standardized dummy PDFs locally and completely free.")
+st.write("Upload original lab reports to generate clean, standardized dummy PDFs.")
 
 uploaded_files = st.file_uploader(
     "Drag and drop PDF files here", type=["pdf"], accept_multiple_files=True
@@ -227,15 +215,15 @@ if uploaded_files:
             st.session_state["output_pdf"] = output_bytes.getvalue()
             status_text.empty()
             progress_bar.empty()
-            st.success(f"✅ Success! Processed all **{total_pages_count} page(s)** locally.")
+            st.success(f"✅ Success! Processed all **{total_pages_count} page(s)** cleanly.")
 
         except Exception as e:
             st.error(f"An error occurred during processing: {str(e)}")
 
     if "output_pdf" in st.session_state:
         st.download_button(
-            label="📥 Download Processed Dummy Report PDF",
+            label="📥 Download Clean Dummy Report PDF",
             data=st.session_state["output_pdf"],
-            file_name="TruMed_Free_Dummy_Report.pdf",
+            file_name="TruMed_Clean_Dummy_Report.pdf",
             mime="application/pdf",
         )
