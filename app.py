@@ -8,7 +8,7 @@ import streamlit as st
 # 1. STREAMLIT PAGE CONFIGURATION & UI
 # ==========================================
 st.set_page_config(
-    page_title="TruMed Path Labs - Precision Masking Generator",
+    page_title="TruMed Path Labs - Dummy Report Generator",
     page_icon="🧪",
     layout="wide",
 )
@@ -88,7 +88,7 @@ st.markdown(
             {logo_html}
             <div>
                 <h1 class="banner-title">TruMed Path Labs India Pvt Ltd.</h1>
-                <div class="banner-subtitle">Precision Masking Dummy Generator</div>
+                <div class="banner-subtitle">Professional Dummy Report Generator</div>
                 <div class="banner-contact">📞 Helpline: +91 703636 63689</div>
                 <div class="banner-address">📍 Central Lab, Plot No. 32, Umakanth Arcade, Vasavi Nagar Colony, Karkhana, Secunderabad, Telangana - 500015</div>
             </div>
@@ -103,10 +103,10 @@ st.markdown(
 
 
 # ==========================================
-# 2. PRECISION SURGICAL VALUE-ONLY REDACTION
+# 2. SAFE & ROBUST REDACTION ENGINE
 # ==========================================
 def apply_margin_watermark(page):
-    """Applies a clean, non-intrusive watermark banner in the top margin at 25% opacity."""
+    """Applies a professional banner watermark in the top margin at 25% opacity."""
     rect = page.rect
     watermark_text = "--- DUMMY REPORT FOR CLIENT REVIEW ---"
     point = fitz.Point(rect.width * 0.32, 88)
@@ -122,29 +122,13 @@ def apply_margin_watermark(page):
 
 
 def process_report_page(page):
-    """Surgically targets only the data values next to labels, keeping headers and layouts completely intact."""
+    """Surgically cleans patient metadata and signatures while keeping layout and department headers intact."""
     
-    # Target keywords that precede sensitive values
-    labels_to_mask = [
-        "Patient Name", "Ref.Doctor", "Ref.Customer", 
-        "SID/PID", "Collected on", "Registered on", "Reported on"
-    ]
+    # 1. Safe Metadata Box Wipe (Targets patient info area strictly without touching department titles below)
+    metadata_box = fitz.Rect(30, 92, 575, 140)
+    page.add_redact_annot(metadata_box, fill=(1, 1, 1))
 
-    for label in labels_to_mask:
-        matches = page.search_for(label)
-        for m in matches:
-            # Create a small redaction box immediately to the right of the label colon
-            val_box = fitz.Rect(m.x1 + 2, m.y0 - 2, m.x1 + 180, m.y1 + 2)
-            page.add_redact_annot(val_box, fill=(1, 1, 1))
-
-    # Redact top QR code block if present
-    top_qr = page.search_for("scan to download")
-    if top_qr:
-        for qr_r in top_qr:
-            qr_box = fitz.Rect(qr_r.x0 - 10, qr_r.y0 - 50, qr_r.x1 + 10, qr_r.y1 + 10)
-            page.add_redact_annot(qr_box, fill=(1, 1, 1))
-
-    # Redact doctor signatures and designations at the bottom
+    # 2. Redact pathologist/doctor signatures at the bottom if present
     for sign_keyword in ["PATHOLOGIST", "BIOCHEMIST", "MD", "DNB", "CONSULTANT"]:
         sign_matches = page.search_for(sign_keyword)
         for sign_rect in sign_matches:
@@ -156,30 +140,16 @@ def process_report_page(page):
             )
             page.add_redact_annot(sig_box, fill=(1, 1, 1))
 
-    # Commit all redactions
+    # Commit redactions
     page.apply_redactions()
 
-    # Stamp clean dummy values back precisely next to their labels
-    replacements = [
-        ("Patient Name", "Mr DUMMY", True),
-        ("Ref.Doctor", "XXX", False),
-        ("SID/PID", "XXX", False),
-    ]
+    # 3. Stamp clean, uniform professional dummy metadata
+    page.insert_text(fitz.Point(35, 105), "Patient Name : Mr DUMMY", fontsize=9, fontname="Helvetica-Bold", color=(0, 0, 0))
+    page.insert_text(fitz.Point(35, 120), "Ref.Doctor   : XXX", fontsize=9, fontname="Helvetica", color=(0, 0, 0))
+    page.insert_text(fitz.Point(320, 105), "SID/PID      : XXX", fontsize=9, fontname="Helvetica", color=(0, 0, 0))
+    page.insert_text(fitz.Point(320, 120), "Sample Type  : Serum", fontsize=9, fontname="Helvetica", color=(0, 0, 0))
 
-    for label, dummy_text, is_bold in replacements:
-        matches = page.search_for(label)
-        if matches:
-            r = matches[0]
-            font_name = "Helvetica-Bold" if is_bold else "Helvetica"
-            page.insert_text(
-                fitz.Point(r.x1 + 4, r.y1 - 1),
-                dummy_text,
-                fontsize=9,
-                fontname=font_name,
-                color=(0, 0, 0),
-            )
-
-    # Apply Margin Watermark Banner
+    # 4. Apply Margin Watermark Banner
     apply_margin_watermark(page)
 
 
@@ -187,7 +157,7 @@ def process_report_page(page):
 # 3. STREAMLIT FILE PROCESSING DASHBOARD
 # ==========================================
 st.subheader("📁 Upload Lab Reports")
-st.write("Upload original lab reports to apply precision value masking.")
+st.write("Upload original lab reports to generate clean dummy PDFs instantly.")
 
 uploaded_files = st.file_uploader(
     "Drag and drop PDF files here", type=["pdf"], accept_multiple_files=True
@@ -202,24 +172,22 @@ if uploaded_files:
 
         try:
             combined_pdf = fitz.open()
-            total_pages_count = sum(
-                len(fitz.open(stream=f.read(), filetype="pdf"))
-                for f in uploaded_files
-            )
-            for f in uploaded_files:
-                f.seek(0)
+            
+            # Calculate total pages across all files for accurate progress tracking
+            doc_list = []
+            total_pages_count = 0
+            for uploaded_file in uploaded_files:
+                d = fitz.open(stream=uploaded_file.read(), filetype="pdf")
+                doc_list.append(d)
+                total_pages_count += len(d)
 
             current_page = 0
-            for uploaded_file in uploaded_files:
-                doc = fitz.open(stream=uploaded_file.read(), filetype="pdf")
-
+            for doc in doc_list:
                 for page_num in range(len(doc)):
                     status_text.text(f"Processing page {current_page + 1} of {total_pages_count}...")
                     page = doc[page_num]
                     process_report_page(page)
-                    combined_pdf.insert_pdf(
-                        doc, from_page=page_num, to_page=page_num
-                    )
+                    combined_pdf.insert_pdf(doc, from_page=page_num, to_page=page_num)
                     current_page += 1
                     progress_bar.progress(current_page / total_pages_count)
 
@@ -230,15 +198,15 @@ if uploaded_files:
             st.session_state["output_pdf"] = output_bytes.getvalue()
             status_text.empty()
             progress_bar.empty()
-            st.success(f"✅ Success! Processed all **{total_pages_count} page(s)** with precision masking.")
+            st.success(f"✅ Success! Processed all **{total_pages_count} page(s)** cleanly.")
 
         except Exception as e:
             st.error(f"An error occurred during processing: {str(e)}")
 
     if "output_pdf" in st.session_state:
         st.download_button(
-            label="📥 Download Precision Dummy Report PDF",
+            label="📥 Download Clean Dummy Report PDF",
             data=st.session_state["output_pdf"],
-            file_name="TruMed_Precision_Masked_Report.pdf",
+            file_name="TruMed_Clean_Dummy_Report.pdf",
             mime="application/pdf",
         )
